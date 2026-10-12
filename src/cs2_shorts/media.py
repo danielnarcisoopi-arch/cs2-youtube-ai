@@ -38,8 +38,24 @@ def _font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
     return ImageFont.load_default()
 
 
-def _skin_image(url: str | None, target: Path, timeout: int) -> bool:
-    """Read the public Skinport item page's OpenGraph image. Never bypass bot controls."""
+def _skin_image(name: str, url: str | None, target: Path, timeout: int) -> bool:
+    """Find this exact skin's image in a public CS2 catalog, then try Skinport OG."""
+    try:
+        # Skinport's API does not expose image URLs, and its web page may omit
+        # OpenGraph images. Match the exact Steam market name in a public catalog.
+        catalog_url = "https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/skins_not_grouped.json"
+        response = requests.get(catalog_url, headers={"User-Agent": "CS2-Market-Shorts/1.0"}, timeout=(8, 45))
+        response.raise_for_status()
+        catalog = response.json()
+        if isinstance(catalog, list):
+            skin = next((row for row in catalog if row.get("market_hash_name") == name), None)
+            image_url = skin.get("image") if skin else None
+            if image_url and _download_image(image_url, target, timeout):
+                return True
+    except Exception as exc:
+        log.info("Public skin catalog lookup unavailable; trying marketplace image: %s", exc)
+
+    # Secondary fallback: public item page only. Do not bypass 403/429 controls.
     if not url or urlparse(url).hostname not in {"skinport.com", "www.skinport.com"}:
         return False
     try:
@@ -51,21 +67,26 @@ def _skin_image(url: str | None, target: Path, timeout: int) -> bool:
         match = re.search(r'<meta[^>]+(?:property|name)=["\']og:image["\'][^>]+content=["\']([^"\']+)', r.text, re.I)
         if not match:
             match = re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\']og:image', r.text, re.I)
-        if not match:
-            return False
-        img_url = html.unescape(match.group(1))
-        if urlparse(img_url).scheme != "https":
-            return False
-        image_response = requests.get(img_url, headers={"User-Agent": "CS2-Market-Shorts/1.0"}, timeout=timeout)
-        image_response.raise_for_status()
-        if len(image_response.content) > 12_000_000:
-            return False
-        target.write_bytes(image_response.content)
+        return bool(match and _download_image(html.unescape(match.group(1)), target, timeout))
+    except Exception as exc:
+        log.warning("Could not retrieve marketplace image; using the designed fallback: %s", exc)
+        target.unlink(missing_ok=True)
+        return False
+
+
+def _download_image(image_url: str, target: Path, timeout: int) -> bool:
+    if urlparse(image_url).scheme != "https":
+        return False
+    response = requests.get(image_url, headers={"User-Agent": "CS2-Market-Shorts/1.0"}, timeout=timeout)
+    response.raise_for_status()
+    if len(response.content) > 12_000_000:
+        return False
+    target.write_bytes(response.content)
+    try:
         with Image.open(target) as im:
             im.verify()
         return True
-    except Exception as exc:
-        log.warning("Could not retrieve marketplace image; using the designed fallback: %s", exc)
+    except Exception:
         target.unlink(missing_ok=True)
         return False
 
@@ -121,7 +142,7 @@ def make_card(copy: VideoCopy, currency: str, market_page: str | None, data_dir:
     draw.text((90, 90), "CS2 MARKET BRIEF", font=_font(32, True), fill="#59E0B3")
     draw.text((90, 145), "LIVE MARKET DATA · SKINPORT", font=_font(20), fill="#a9b9ca")
     image_path = data_dir / "item-image.jpg"
-    got_image = image_fetch and _skin_image(item.get("item_page"), image_path, image_timeout)
+    got_image = image_fetch and _skin_image(item["name"], item.get("item_page"), image_path, image_timeout)
     image_box = (100, 220, 980, 750)
     if got_image:
         try:
@@ -193,7 +214,7 @@ def _stamp(seconds: float) -> str:
 
 
 async def _synthesize(text: str, voice: str, path: Path) -> Path:
-    """Prefer Edge TTS, with a free local voice if Microsoft's endpoint is unavailable."""
+    """Prefer Edge TTS; use a free neural Piper voice when its endpoint is unavailable."""
     last_error: Exception | None = None
     for attempt in range(2):
         try:
@@ -207,22 +228,17 @@ async def _synthesize(text: str, voice: str, path: Path) -> Path:
                 log.warning("Edge-TTS failed; retrying once before using local speech: %s", exc)
                 await asyncio.sleep(2)
 
-    espeak = shutil.which("espeak-ng")
-    if not espeak:
-        raise RuntimeError(
-            "Edge-TTS failed and the free local fallback 'espeak-ng' is not installed"
-        ) from last_error
-
-    # eSpeak NG is free and runs on the GitHub runner without an API key.
-    # Map en-US-GuyNeural to the closest local English voice (en-us).
-    voice_parts = voice.split("-")
-    local_voice = "-".join(voice_parts[:2]).lower() if len(voice_parts) >= 2 else "en-us"
+    piper_voice = "en_US-libritts_r-medium"
     fallback_path = path.with_suffix(".wav")
-    subprocess.run(
-        [espeak, "-v", local_voice, "-s", "150", "-w", str(fallback_path), text],
-        check=True, capture_output=True, text=True,
-    )
-    log.warning("Edge-TTS unavailable after retry; generated narration with local voice %s", local_voice)
+    try:
+        subprocess.run(
+            [shutil.which("python") or "python", "-m", "piper", "-m", piper_voice,
+             "--data-dir", "data/voices", "-f", str(fallback_path), "--", text],
+            check=True, capture_output=True, text=True, timeout=180,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
+        raise RuntimeError("Edge-TTS failed and the free neural Piper fallback could not synthesize audio") from (exc or last_error)
+    log.warning("Edge-TTS unavailable after retry; generated narration with Piper neural voice %s", piper_voice)
     return fallback_path
 
 

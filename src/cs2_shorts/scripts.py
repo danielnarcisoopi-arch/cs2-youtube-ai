@@ -68,5 +68,7 @@ def build_copy(topic: str, rows: list[dict[str, Any]], currency: str) -> VideoCo
     description = (f"Market snapshot in {currency}, sourced from Skinport public market data. "
                    "Percentage changes compare our nearest stored snapshots around 24 hours or 7 days apart. "
                    "Budget and volume rankings use reported marketplace sales data. This is informational content, not financial advice.\n\n"
+                   "Item images: https://github.com/ByMykel/CSGO-API. "
+                   "Fallback narration voice: Piper with LibriTTS-R (CC BY 4.0).\n"
                    f"Data source: https://skinport.com/\n{hashtags}")
     return VideoCopy(title[:100], description, ["CS2", "CS2 skins", "skin trading", "Skinport", "Counter-Strike 2"], narration, topic, item)

@@ -1,0 +1,11 @@
+CS2 Shorts patch: improved voice and skin images
+
+Extract this ZIP, then upload/replace the files while keeping these paths in the repository root:
+- requirements.txt
+- .github/workflows/publish.yml
+- src/cs2_shorts/media.py
+- src/cs2_shorts/scripts.py
+- README.md
+
+Commit the changes, then run Actions > CS2 market Shorts > Run workflow.
+Do not upload this ZIP as a ZIP file into the repository; GitHub will not unpack it.

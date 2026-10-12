@@ -22,7 +22,9 @@ The current price is the lowest Skinport listing (`min_price`; suggested price i
 
 Steam Community Market does not provide a documented, stable public API for this complete feed. CSFloat's documented API uses API-key authentication and does not replace Skinport's free full-catalog price-history feed. The provider interface is isolated so additional authorized APIs can be added without changing the renderer or ranking calculations. No private endpoints or bot/CAPTCHA bypass are used.
 
-The item picture is read from the public Skinport item's OpenGraph metadata, only for the one featured item per video. Image retrieval is best-effort and uses a branded fallback card when the page declines access or has no image. Check the marketplace's current terms before enabling image retrieval for a commercial channel; set `MARKET_IMAGE_FETCH=false` to turn it off.
+The featured item's picture is matched by exact market name against the public ByMykel/CSGO-API item catalog. If that catalog or the image is unavailable, the renderer tries the public Skinport item's OpenGraph metadata and then uses a branded fallback. This is best-effort; check current image and game-asset terms before commercial use. Set `MARKET_IMAGE_FETCH=false` to turn image retrieval off.
+
+Narration tries Edge-TTS first. If Microsoft's endpoint rejects the request (for example, HTTP 403), the workflow uses a downloaded Piper neural voice instead of the very robotic eSpeak fallback. The fallback model is `en_US-libritts_r-medium`; its model card identifies the LibriTTS-R dataset under CC BY 4.0, and the generated YouTube description credits it. The initial workflow setup downloads the model into `data/voices`.
 
 ## Directory tree
 
@@ -49,7 +51,7 @@ cs2-shorts/
 
 ## Run locally
 
-Requirements: Python 3.11+, FFmpeg/ffprobe, a font installed on the OS, and network access to Skinport and Edge-TTS.
+Requirements: Python 3.11+, FFmpeg/ffprobe, a font installed on the OS, and network access to Skinport, Edge-TTS, the image catalog and Hugging Face for the Piper fallback voice.
 
 ```bash
 python -m venv .venv
