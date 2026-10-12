@@ -82,6 +82,12 @@ class MarketStore:
         return self.db.execute("SELECT 1 FROM published WHERE item_key=? AND topic=? AND published_at>=? LIMIT 1",
                                (item_key, topic, since)).fetchone() is not None
 
+    def recently_published_items(self, within_hours: int = 48) -> set[str]:
+        """Return featured items published recently, independent of topic."""
+        since = (datetime.now(timezone.utc) - timedelta(hours=within_hours)).isoformat(timespec="seconds")
+        rows = self.db.execute("SELECT DISTINCT item_key FROM published WHERE published_at>=?", (since,)).fetchall()
+        return {str(row["item_key"]) for row in rows}
+
     def record_published(self, topic: str, video_id: str, title: str, item_key: str) -> None:
         self.db.execute("INSERT INTO published(published_at,topic,video_id,title,item_key) VALUES(?,?,?,?,?)",
                         (datetime.now(timezone.utc).isoformat(timespec="seconds"), topic, video_id, title, item_key))

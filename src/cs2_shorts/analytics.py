@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 from typing import Any
 
 
@@ -31,3 +32,13 @@ def choose_topic(ranks: dict[str, list[dict[str, Any]]], run_number: int = 0) ->
         if rows:
             return topic, rows[:5]
     return "market_watch", []
+
+
+def choose_spotlight(ranks: dict[str, list[dict[str, Any]]], recently_published: set[str], chooser=None) -> tuple[str, dict[str, Any]]:
+    """Pick a real ranked item at random, preferring skins not featured recently."""
+    topics = ("gainers", "losers", "budget", "weekly", "dollar_volume", "volatility")
+    available = [(topic, item) for topic in topics for item in ranks.get(topic, [])]
+    if not available:
+        raise ValueError("No ranked items are available for a spotlight")
+    fresh = [(topic, item) for topic, item in available if item["name"] not in recently_published]
+    return (chooser or secrets.choice)(fresh or available)

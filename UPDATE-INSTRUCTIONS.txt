@@ -1,11 +1,6 @@
-CS2 Shorts patch: improved voice and skin images
+Atualização CS2 Shorts: cenas diferentes, seleção aleatória de tema/skin e prevenção de repetição.
 
-Extract this ZIP, then upload/replace the files while keeping these paths in the repository root:
-- requirements.txt
-- .github/workflows/publish.yml
-- src/cs2_shorts/media.py
-- src/cs2_shorts/scripts.py
-- README.md
+Extraia o ZIP e carregue/substitua os ficheiros no repositório mantendo os caminhos indicados. São nove ficheiros, incluindo .github/workflows/publish.yml, src/cs2_shorts e tests.
 
-Commit the changes, then run Actions > CS2 market Shorts > Run workflow.
-Do not upload this ZIP as a ZIP file into the repository; GitHub will not unpack it.
+Faça Commit changes. Depois execute Actions > CS2 market Shorts > Run workflow uma vez para testar. O sistema evita voltar a destacar uma skin publicada nas últimas 48 horas quando há outras skins elegíveis. Os dados de preço continuam a vir da Skinport e não são inventados.
+Não carregue o ZIP fechado; extraia-o primeiro.

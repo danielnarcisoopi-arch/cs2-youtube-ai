@@ -1,4 +1,4 @@
-from cs2_shorts.analytics import choose_topic, rankings
+from cs2_shorts.analytics import choose_spotlight, choose_topic, rankings
 
 
 def item(name, **kw):
@@ -23,3 +23,17 @@ def test_topic_picker_skips_empty_rankings():
     empty = {key: [] for key in ("gainers", "losers", "budget", "weekly", "dollar_volume", "volatility")}
     empty["budget"] = [item("budget")]
     assert choose_topic(empty, 0)[0] == "budget"
+
+
+def test_spotlight_avoids_recent_skins_when_fresh_candidates_exist():
+    ranks = {"gainers": [item("recent"), item("fresh")], "losers": [item("another")]}
+    topic, selected = choose_spotlight(ranks, {"recent"}, chooser=lambda choices: choices[0])
+    assert topic == "gainers"
+    assert selected["name"] == "fresh"
+
+
+def test_spotlight_falls_back_after_fresh_pool_is_exhausted():
+    ranks = {"budget": [item("recent")]}
+    topic, selected = choose_spotlight(ranks, {"recent"}, chooser=lambda choices: choices[0])
+    assert topic == "budget"
+    assert selected["name"] == "recent"

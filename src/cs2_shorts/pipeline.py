@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from .analytics import choose_topic, rankings
+from .analytics import choose_spotlight, rankings
 from .config import settings, validate_settings
 from .media import render_video
 from .providers.skinport import SkinportProvider
@@ -30,19 +32,19 @@ def run() -> Path:
         current = store.candidates(captured_at)
         rank = rankings(current, cfg.min_volume_24h, cfg.min_listings)
         now = datetime.now(timezone.utc).astimezone(ZoneInfo("Europe/Lisbon"))
-        slot = now.hour // 4
-        topic_idx = ((now.timetuple().tm_yday * 4) + slot) % 6
-        topic, selected = choose_topic(rank, topic_idx)
-        if not selected:
+        try:
+            recent_items = store.recently_published_items(within_hours=48)
+            topic, featured = choose_spotlight(rank, recent_items)
+        except ValueError:
             raise RuntimeError("No items meet the minimum activity/data rules; refusing to fabricate a market story")
-        # Avoid publishing identical item/topic combinations within the same daily cycle.
-        selected = [r for r in selected if not store.already_published(r["name"], topic)] or selected
-        copy = build_copy(topic, selected[:5], cfg.currency)
+        # Mix real themes/items; avoid repeating a featured skin for 48h when possible.
+        copy = build_copy(topic, [featured], cfg.currency, spotlight=True)
         featured_name = copy.featured["name"]
         trend = store.db.execute("SELECT captured_at,price FROM snapshots WHERE name=? ORDER BY captured_at DESC LIMIT 40", (featured_name,)).fetchall()
         chart_points = [(datetime.fromisoformat(r["captured_at"]).astimezone(ZoneInfo("Europe/Lisbon")).strftime("%d %b"), r["price"])
                         for r in reversed(trend)]
-        stamp = now.strftime("%Y%m%d-%H%M")
+        run_id = os.getenv("GITHUB_RUN_ID") or secrets.token_hex(3)
+        stamp = f"{now.strftime('%Y%m%d-%H%M')}-{run_id}"
         video_path = cfg.output_dir / f"{stamp}-{topic}.mp4"
         duration = render_video(copy, cfg.currency, copy.featured.get("market_page"), chart_points,
             cfg.data_dir / "render", video_path, cfg.voice, cfg.image_fetch, cfg.image_timeout)

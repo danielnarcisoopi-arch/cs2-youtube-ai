@@ -128,63 +128,104 @@ def _wrap(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, wi
     return lines
 
 
-def make_card(copy: VideoCopy, currency: str, market_page: str | None, data_dir: Path,
-              chart_points: list[tuple[str, float]], image_fetch: bool = True, image_timeout: int = 8) -> Path:
+def make_scenes(copy: VideoCopy, currency: str, data_dir: Path,
+                chart_points: list[tuple[str, float]], image_fetch: bool = True,
+                image_timeout: int = 8) -> list[Path]:
+    """Create three distinct vertical scenes instead of holding on one poster."""
     data_dir.mkdir(parents=True, exist_ok=True)
     item = copy.featured
-    bg = Image.new("RGB", (W, H), "#08111f")
-    px = bg.load()
-    for y in range(H):
-        c = int(8 + 12 * y / H)
-        for x in range(W): px[x, y] = (c, c + 7, c + 19)
-    draw = ImageDraw.Draw(bg)
-    draw.rounded_rectangle((50, 55, 1030, 1860), radius=42, fill="#0e1b2e", outline="#263b52", width=2)
-    draw.text((90, 90), "CS2 MARKET BRIEF", font=_font(32, True), fill="#59E0B3")
-    draw.text((90, 145), "LIVE MARKET DATA · SKINPORT", font=_font(20), fill="#a9b9ca")
+    name = item["name"]
     image_path = data_dir / "item-image.jpg"
-    got_image = image_fetch and _skin_image(item["name"], item.get("item_page"), image_path, image_timeout)
-    image_box = (100, 220, 980, 750)
-    if got_image:
+    got_image = image_fetch and _skin_image(name, item.get("item_page"), image_path, image_timeout)
+    chart_path = data_dir / "chart-scenes.png"
+    _chart(chart_points, chart_path)
+
+    def canvas(index: int) -> tuple[Image.Image, ImageDraw.ImageDraw]:
+        bg = Image.new("RGB", (W, H), "#08111f")
+        pix = bg.load()
+        for y in range(H):
+            for x in range(W):
+                glow = int(8 * max(0, 1 - abs(x - (250 + index * 270)) / W))
+                pix[x, y] = (8 + glow, 15 + glow, 29 + glow * 2)
+        draw = ImageDraw.Draw(bg)
+        draw.rounded_rectangle((45, 50, 1035, 1870), radius=48,
+                               fill="#0e1b2e", outline="#263b52", width=2)
+        draw.text((90, 90), "CS2 MARKET BRIEF", font=_font(30, True), fill="#59E0B3")
+        return bg, draw
+
+    def put_skin(bg: Image.Image, box: tuple[int, int, int, int]) -> bool:
+        if not got_image:
+            return False
         try:
             with Image.open(image_path) as source:
-                im = ImageOps.contain(source.convert("RGB"), (830, 470))
-            bg.paste(im, (W//2-im.width//2, 260+(440-im.height)//2))
-        except Exception:
-            got_image = False
-    if not got_image:
-        # Clean branded product panel when the market page doesn't expose an image.
-        draw.rounded_rectangle(image_box, radius=28, fill="#122943", outline="#274663", width=2)
-        draw.text((145, 400), "CS2 SKIN", font=_font(30, True), fill="#59E0B3")
-        for idx, line in enumerate(_wrap(draw, item["name"], _font(39, True), 760)[:3]):
-            draw.text((145, 455 + idx*54), line, font=_font(39, True), fill="white")
-    name_lines = _wrap(draw, item["name"], _font(34, True), 890)[:2]
-    yy = 790
-    for line in name_lines:
-        draw.text((90, yy), line, font=_font(34, True), fill="white")
-        yy += 48
-    draw.text((90, yy+20), f"{currency} {item['price']:.2f}", font=_font(58, True), fill="white")
+                art = ImageOps.contain(source.convert("RGBA"), (box[2] - box[0], box[3] - box[1]))
+            bg.paste(art, (box[0] + (box[2] - box[0] - art.width) // 2,
+                           box[1] + (box[3] - box[1] - art.height) // 2), art)
+            return True
+        except Exception as exc:
+            log.info("Could not place skin artwork in video scene: %s", exc)
+            return False
+
+    scenes: list[Path] = []
     change = item.get("change_24h_pct")
-    if change is None: change = item.get("change_7d_pct")
-    change_text = "Building price history" if change is None else f"{change:+.2f}%"
-    draw.rounded_rectangle((650, yy+8, 970, yy+105), radius=25, fill="#153d3c" if change is None or change >= 0 else "#4a242d")
-    draw.text((690, yy+24), change_text, font=_font(39, True), fill="#59E0B3" if change is None or change >= 0 else "#ff8794")
-    draw.text((95, 1040), "PRICE HISTORY · STORED SNAPSHOTS", font=_font(22, True), fill="#a9b9ca")
-    chart_path = data_dir / "chart.png"
-    _chart(chart_points, chart_path)
+    if change is None:
+        change = item.get("change_7d_pct")
+    change_label = "MARKET WATCH" if change is None else f"{change:+.1f}%"
+
+    # Scene 1: fast hook with the featured skin artwork.
+    bg, draw = canvas(0)
+    draw.text((90, 190), "TODAY'S BIG MOVE", font=_font(29, True), fill="#a9b9ca")
+    for idx, line in enumerate(_wrap(draw, name, _font(48, True), 850)[:3]):
+        draw.text((90, 255 + idx * 66), line, font=_font(48, True), fill="white")
+    draw.text((90, 500), change_label, font=_font(112, True), fill="#59E0B3" if change is None or change >= 0 else "#ff8794")
+    draw.rounded_rectangle((80, 700, 1000, 1250), radius=38, fill="#122943", outline="#274663", width=2)
+    if not put_skin(bg, (115, 735, 965, 1215)):
+        draw.text((130, 850), "CS2 SKIN", font=_font(35, True), fill="#59E0B3")
+        for idx, line in enumerate(_wrap(draw, name, _font(42, True), 750)[:3]):
+            draw.text((130, 920 + idx * 58), line, font=_font(42, True), fill="white")
+    draw.text((90, 1330), f"CURRENT LOW LISTING  {currency} {item['price']:.2f}", font=_font(31, True), fill="white")
+    draw.text((90, 1760), "PRICE MOVES CAN REVERSE QUICKLY", font=_font(25, True), fill="#a9b9ca")
+    scenes.append(data_dir / "scene-1.png")
+    bg.save(scenes[-1])
+
+    # Scene 2: market facts, sales activity and a different crop/scale of the image.
+    bg, draw = canvas(1)
+    draw.text((90, 200), "PRICE CHECK", font=_font(34, True), fill="#a9b9ca")
+    if not put_skin(bg, (90, 300, 990, 870)):
+        draw.rounded_rectangle((90, 300, 990, 870), radius=34, fill="#122943", outline="#274663", width=2)
+        draw.text((140, 500), "LIVE SKINPORT SNAPSHOT", font=_font(34, True), fill="#59E0B3")
+    draw.text((90, 940), f"{currency} {item['price']:.2f}", font=_font(83, True), fill="white")
+    draw.text((95, 1060), "LOWEST CURRENT LISTING", font=_font(26, True), fill="#a9b9ca")
+    draw.rounded_rectangle((85, 1180, 525, 1435), radius=28, fill="#122943")
+    draw.text((125, 1220), f"{item.get('volume_24h', 0):,}", font=_font(64, True), fill="#59E0B3")
+    draw.text((125, 1310), "SALES · 24H", font=_font(25, True), fill="white")
+    draw.rounded_rectangle((555, 1180, 995, 1435), radius=28, fill="#122943")
+    draw.text((595, 1220), f"{item.get('quantity', 0):,}", font=_font(64, True), fill="#59E0B3")
+    draw.text((595, 1310), "LISTED NOW", font=_font(25, True), fill="white")
+    draw.text((90, 1650), "MARKETPLACE FEES AFFECT SELLER RETURNS", font=_font(24, True), fill="#a9b9ca")
+    scenes.append(data_dir / "scene-2.png")
+    bg.save(scenes[-1])
+
+    # Scene 3: price history takes over the frame, followed by a clear CTA.
+    bg, draw = canvas(2)
+    draw.text((90, 200), "TRACK THE PRICE", font=_font(34, True), fill="#a9b9ca")
+    draw.text((90, 300), name[:44], font=_font(38, True), fill="white")
     try:
         with Image.open(chart_path).convert("RGBA") as chart:
-            chart.thumbnail((890, 310))
-            bg.paste(chart, (90, 1080), chart)
-    except Exception:
-        pass
-    draw.text((95, 1425), f"24H SALES: {item.get('volume_24h', 0):,}", font=_font(27, True), fill="white")
-    draw.text((95, 1475), f"LISTED: {item.get('quantity', 0):,}", font=_font(27, True), fill="#b7c7d8")
-    draw.text((95, 1600), "MARKET DATA · NOT FINANCIAL ADVICE", font=_font(22, True), fill="#59E0B3")
-    if market_page:
-        draw.text((95, 1640), "Source: Skinport public market feed", font=_font(19), fill="#a9b9ca")
-    path = data_dir / "card.png"
-    bg.save(path)
-    return path
+            chart.thumbnail((900, 650))
+            bg.paste(chart, (90, 470), chart)
+    except Exception as exc:
+        log.info("Could not place chart in final scene: %s", exc)
+    if item.get("change_24h_pct") is not None:
+        draw.text((95, 1210), f"24H CHANGE  {item['change_24h_pct']:+.2f}%", font=_font(39, True), fill="#59E0B3" if item["change_24h_pct"] >= 0 else "#ff8794")
+    if item.get("change_7d_pct") is not None:
+        draw.text((95, 1285), f"7D CHANGE  {item['change_7d_pct']:+.2f}%", font=_font(34, True), fill="white")
+    draw.rounded_rectangle((85, 1480, 995, 1690), radius=32, fill="#153d3c")
+    draw.text((130, 1542), "WOULD YOU BUY, SELL OR WAIT?", font=_font(35, True), fill="white")
+    draw.text((95, 1760), "COMMENT BELOW · NOT FINANCIAL ADVICE", font=_font(23, True), fill="#59E0B3")
+    scenes.append(data_dir / "scene-3.png")
+    bg.save(scenes[-1])
+    return scenes
 
 
 def _srt_text(narration: str, duration: float) -> str:
@@ -248,7 +289,7 @@ def render_video(copy: VideoCopy, currency: str, market_page: str | None, chart_
     ffmpeg, ffprobe = require_binary("ffmpeg"), require_binary("ffprobe")
     data_dir.mkdir(parents=True, exist_ok=True)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    card = make_card(copy, currency, market_page, data_dir, chart_points, image_fetch, image_timeout)
+    scenes = make_scenes(copy, currency, data_dir, chart_points, image_fetch, image_timeout)
     audio = asyncio.run(_synthesize(copy.narration, voice, data_dir / "voice.mp3"))
     probe = subprocess.run([ffprobe, "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(audio)],
                            check=True, capture_output=True, text=True)
@@ -261,9 +302,23 @@ def render_video(copy: VideoCopy, currency: str, market_page: str | None, chart_
     srt = data_dir / "captions.srt"
     srt.write_text(_srt_text(copy.narration, target), encoding="utf-8")
     srt_arg = str(srt).replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
-    command = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error", "-loop", "1", "-framerate", "30", "-i", str(card), "-i", str(audio),
-        "-vf", f"zoompan=z='min(zoom+0.00035,1.08)':d={int(target*30)}:s=1080x1920:fps=30,subtitles='{srt_arg}':force_style='FontName=DejaVu Sans,FontSize=14,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=3,Outline=1,Shadow=0,Alignment=2,MarginV=230'",
-        "-af", f"atempo={atempo:.5f},apad=pad_dur=0.2", "-t", f"{target:.3f}", "-r", "30", "-c:v", "libx264", "-preset", "medium", "-crf", "21", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(output_path)]
+    scene_durations = [target * 0.32, target * 0.38, target * 0.30]
+    command = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error"]
+    for scene, scene_duration in zip(scenes, scene_durations):
+        command.extend(["-loop", "1", "-framerate", "30", "-t", f"{scene_duration:.3f}", "-i", str(scene)])
+    audio_input = len(scenes)
+    command.extend(["-i", str(audio)])
+    filters: list[str] = []
+    for index, scene_duration in enumerate(scene_durations):
+        filters.append(
+            f"[{index}:v]zoompan=z='min(zoom+0.00045,1.07)':d=1:s=1080x1920:fps=30,"
+            f"trim=duration={scene_duration:.3f},setpts=PTS-STARTPTS[v{index}]"
+        )
+    concat_inputs = "".join(f"[v{i}]" for i in range(len(scenes)))
+    subtitle_style = "FontName=DejaVu Sans,FontSize=14,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=3,Outline=1,Shadow=0,Alignment=2,MarginV=230"
+    filters.append(f"{concat_inputs}concat=n={len(scenes)}:v=1:a=0,subtitles='{srt_arg}':force_style='{subtitle_style}'[vfinal]")
+    command.extend(["-filter_complex", ";".join(filters), "-map", "[vfinal]", "-map", f"{audio_input}:a:0",
+        "-af", f"atempo={atempo:.5f},apad=pad_dur=0.2", "-t", f"{target:.3f}", "-r", "30", "-c:v", "libx264", "-preset", "medium", "-crf", "21", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(output_path)])
     subprocess.run(command, check=True, capture_output=True, text=True)
     verify = subprocess.run([ffprobe, "-v", "error", "-show_entries", "format=duration:stream=width,height", "-of", "default=noprint_wrappers=1", str(output_path)],
                             check=True, capture_output=True, text=True).stdout

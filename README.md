@@ -6,8 +6,9 @@ A Python + FFmpeg pipeline that reads live CS2 market data, builds fact-bound ra
 
 - Live catalog prices, listing counts, 24-hour sale volume, and 24-hour/7-day sale aggregates from Skinport's public API.
 - Rankings for 24h gainers/losers, 7-day movers, budget items, estimated traded value and a sale-price-range volatility measure.
+- Randomized, data-bound single-skin spotlights. Recently published skins are avoided for 48 hours when enough candidates are available, so rerunning the workflow does not keep choosing the same story.
 - Stored point-in-time snapshots. Exact 24-hour and 7-day comparison prices are only reported after enough history has been collected. A nearest sample within eight hours of the target is used to tolerate scheduled-run delays.
-- One Short per run: 1080x1920 MP4, 30–42 seconds, generated speech, sentence-level captions, price chart, item price and simple zoom animation.
+- One Short per run: 1080x1920 MP4, 30–42 seconds, generated speech, sentence-level captions, three changing scenes (skin hook, market facts, price chart/CTA), and gradual zoom movement in each scene.
 - Automated title, description and tags; upload through YouTube Data API OAuth refresh tokens.
 - SQLite market history persisted in the Git repository by the workflow; snapshots older than the retention setting are removed.
 - Retry handling, HTTP timeouts, 429/5xx retries, error logs, upload switch and rendering checks.

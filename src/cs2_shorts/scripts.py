@@ -14,7 +14,7 @@ class VideoCopy:
     featured: dict[str, Any]
 
 
-def build_copy(topic: str, rows: list[dict[str, Any]], currency: str) -> VideoCopy:
+def build_copy(topic: str, rows: list[dict[str, Any]], currency: str, spotlight: bool = False) -> VideoCopy:
     if not rows:
         raise ValueError("No credible rows for script")
     item = rows[0]
@@ -22,36 +22,37 @@ def build_copy(topic: str, rows: list[dict[str, Any]], currency: str) -> VideoCo
     pct24 = item.get("change_24h_pct")
     pct7 = item.get("change_7d_pct")
     if topic == "gainers":
-        title = f"CS2 Market: {name} {pct24:+.1f}% in 24h" if pct24 is not None else f"CS2 Market Watch: {name}"
-        hook = f"The {name} is one of today's strongest CS2 market movers, up {abs(pct24):.1f} percent over the last 24 hours." if pct24 is not None else f"The {name} is one of today's strongest CS2 market movers."
-        intro = "Here are today's leading CS2 skin gainers, ranked using Skinport listing snapshots."
+        title = f"CS2 Skin Watch: {name} {pct24:+.1f}% in 24h" if pct24 is not None else f"CS2 Market Watch: {name}"
+        hook = f"The {name} is among today's tracked gainers, up {abs(pct24):.1f} percent in 24 hours." if pct24 is not None else f"The {name} is one of today's tracked CS2 market movers."
+        intro = "This is a single-skin spotlight based on today's Skinport market snapshot." if spotlight else "Here are today's leading CS2 skin gainers, ranked using Skinport listing snapshots."
     elif topic == "losers":
-        title = f"CS2 Market Drop: {name} {pct24:.1f}% in 24h" if pct24 is not None else f"CS2 Market Watch: {name}"
-        hook = f"The {name} is down {abs(pct24):.1f} percent over the last 24 hours, putting it among today's biggest drops." if pct24 is not None else f"The {name} is among the most watched items today."
-        intro = "Here are the biggest tracked CS2 skin price drops from the last 24 hours."
+        title = f"CS2 Skin Watch: {name} {pct24:.1f}% in 24h" if pct24 is not None else f"CS2 Market Watch: {name}"
+        hook = f"The {name} is among today's tracked decliners, down {abs(pct24):.1f} percent in 24 hours." if pct24 is not None else f"The {name} is among the most watched items today."
+        intro = "This is a single-skin spotlight based on today's Skinport market snapshot." if spotlight else "Here are the biggest tracked CS2 skin price drops from the last 24 hours."
     elif topic == "budget":
-        title = f"CS2 Skins Under {currency} 20 to Watch Today"
+        title = f"Under {currency} 20 Skin Watch: {name}" if spotlight else f"CS2 Skins Under {currency} 20 to Watch Today"
         hook = f"Looking for CS2 skins under 20 {currency}? The {name} is one of today's most actively traded budget picks."
-        intro = "These lower-priced skins have recent Skinport sales activity. A low price alone does not make an item a good investment."
+        intro = "This budget skin has recent Skinport sales activity. A low price alone does not make it a good investment." if spotlight else "These lower-priced skins have recent Skinport sales activity. A low price alone does not make an item a good investment."
     elif topic == "weekly":
         title = f"CS2 Skin Weekly Movers: {name} {pct7:+.1f}%" if pct7 is not None else f"CS2 Market Watch: {name}"
         hook = f"Over the tracked seven-day window, the {name} moved {pct7:+.1f} percent." if pct7 is not None else f"The {name} is on today's CS2 watchlist."
-        intro = "Here are notable CS2 skin moves across our rolling seven-day snapshot window."
+        intro = "This is one skin from our rolling seven-day market watchlist." if spotlight else "Here are notable CS2 skin moves across our rolling seven-day snapshot window."
     elif topic == "dollar_volume":
-        title = f"CS2 Market: Highest Traded Value Today"
+        title = f"CS2 Trading Activity Spotlight: {name}" if spotlight else "CS2 Market: Highest Traded Value Today"
         hook = f"The {name} is among the highest traded-value CS2 skins today on Skinport."
-        intro = "This ranking estimates traded value from average sale price multiplied by reported 24-hour sales volume."
+        intro = "This spotlight estimates traded value from average sale price multiplied by reported 24-hour sales volume." if spotlight else "This ranking estimates traded value from average sale price multiplied by reported 24-hour sales volume."
     elif topic == "volatility":
-        title = "CS2 Skins With the Widest Price Range Today"
+        title = f"CS2 Volatility Watch: {name}" if spotlight else "CS2 Skins With the Widest Price Range Today"
         hook = f"The {name} had one of the widest reported sale-price ranges in today's Skinport data."
-        intro = "This volatility list compares the reported low-to-high sale-price range with each item's average sale price over 24 hours."
+        intro = "This volatility spotlight compares the reported low-to-high sale-price range with the item's average sale price over 24 hours." if spotlight else "This volatility list compares the reported low-to-high sale-price range with each item's average sale price over 24 hours."
     else:
         title = f"CS2 Skins With the Most Market Activity Today"
         hook = f"The {name} is seeing strong activity compared with its current Skinport listing count."
         intro = "This is an activity watchlist, not a price-volatility ranking."
     lines = []
     for i, r in enumerate(rows[:5]):
-        line = f"Number {i + 1}: {r['name']}, {currency} {r['price']:.2f}"
+        line = (f"Current listing: {r['name']}, {currency} {r['price']:.2f}" if spotlight
+                else f"Number {i + 1}: {r['name']}, {currency} {r['price']:.2f}")
         if topic == "volatility" and r.get("volatility_pct") is not None:
             line += f", price range {r['volatility_pct']:.1f} percent of average."
         elif topic == "weekly" and r.get("change_7d_pct") is not None:
