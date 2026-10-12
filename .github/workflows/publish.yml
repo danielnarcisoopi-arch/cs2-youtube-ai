@@ -34,7 +34,7 @@ jobs:
       - name: Install FFmpeg and fonts
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          sudo apt-get install -y ffmpeg fonts-dejavu-core espeak-ng
       - name: Install Python dependencies
         run: python -m pip install -r requirements.txt
       - name: Install project package
@@ -52,7 +52,14 @@ jobs:
             git add data/market.sqlite3
             if ! git diff --cached --quiet; then
               git commit -m 'chore: update CS2 market snapshots'
-              git push
+              branch="${GITHUB_REF_NAME}"
+              git fetch origin "$branch"
+              if git rebase "origin/$branch"; then
+                git push origin "HEAD:$branch" || echo '::warning::Could not push market history; keeping the generated video run result.'
+              else
+                git rebase --abort || true
+                echo '::warning::Could not rebase market history; keeping the generated video run result.'
+              fi
             fi
           fi
       - name: Save generated media and logs
