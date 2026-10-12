@@ -192,9 +192,38 @@ def _stamp(seconds: float) -> str:
     return f"{h:02}:{m:02}:{s:02},{ms:03}"
 
 
-async def _synthesize(text: str, voice: str, path: Path) -> None:
-    communicate = edge_tts.Communicate(text, voice)
-    await communicate.save(str(path))
+async def _synthesize(text: str, voice: str, path: Path) -> Path:
+    """Prefer Edge TTS, with a free local voice if Microsoft's endpoint is unavailable."""
+    last_error: Exception | None = None
+    for attempt in range(2):
+        try:
+            communicate = edge_tts.Communicate(text, voice)
+            await communicate.save(str(path))
+            return path
+        except Exception as exc:
+            last_error = exc
+            path.unlink(missing_ok=True)
+            if attempt == 0:
+                log.warning("Edge-TTS failed; retrying once before using local speech: %s", exc)
+                await asyncio.sleep(2)
+
+    espeak = shutil.which("espeak-ng")
+    if not espeak:
+        raise RuntimeError(
+            "Edge-TTS failed and the free local fallback 'espeak-ng' is not installed"
+        ) from last_error
+
+    # eSpeak NG is free and runs on the GitHub runner without an API key.
+    # Map en-US-GuyNeural to the closest local English voice (en-us).
+    voice_parts = voice.split("-")
+    local_voice = "-".join(voice_parts[:2]).lower() if len(voice_parts) >= 2 else "en-us"
+    fallback_path = path.with_suffix(".wav")
+    subprocess.run(
+        [espeak, "-v", local_voice, "-s", "150", "-w", str(fallback_path), text],
+        check=True, capture_output=True, text=True,
+    )
+    log.warning("Edge-TTS unavailable after retry; generated narration with local voice %s", local_voice)
+    return fallback_path
 
 
 def render_video(copy: VideoCopy, currency: str, market_page: str | None, chart_points: list[tuple[str, float]],
@@ -204,8 +233,7 @@ def render_video(copy: VideoCopy, currency: str, market_page: str | None, chart_
     data_dir.mkdir(parents=True, exist_ok=True)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     card = make_card(copy, currency, market_page, data_dir, chart_points, image_fetch, image_timeout)
-    audio = data_dir / "voice.mp3"
-    asyncio.run(_synthesize(copy.narration, voice, audio))
+    audio = asyncio.run(_synthesize(copy.narration, voice, data_dir / "voice.mp3"))
     probe = subprocess.run([ffprobe, "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(audio)],
                            check=True, capture_output=True, text=True)
     original_duration = float(probe.stdout.strip())
