@@ -23,7 +23,10 @@ jobs:
       YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
       YOUTUBE_PRIVACY_STATUS: public
       YOUTUBE_NOTIFY_SUBSCRIBERS: 'false'
-      EDGE_TTS_VOICE: en-US-GuyNeural
+      EDGE_TTS_VOICE: en-US-AriaNeural
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+      ELEVENLABS_VOICE_ID: ${{ vars.ELEVENLABS_VOICE_ID }}
+      CS2_MUSIC_PATH: ${{ vars.CS2_MUSIC_PATH }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
