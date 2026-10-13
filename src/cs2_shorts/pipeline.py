@@ -6,6 +6,7 @@ import os
 import secrets
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from .analytics import choose_spotlight, rankings
 from .config import settings, validate_settings
