@@ -1,19 +1,23 @@
 # CS2 Market Shorts
 
-A Python + FFmpeg pipeline that reads live CS2 market data, builds fact-bound rankings, renders vertical videos with Edge-TTS narration, captions and a price chart, and uploads them to YouTube using OAuth.
+A Python + FFmpeg pipeline that reads CS2 skin-market data, turns one verified market signal into a short vertical news story, and uploads through YouTube OAuth.
 
 ## What is implemented
 
 - Live catalog prices, listing counts, 24-hour sale volume, and 24-hour/7-day sale aggregates from Skinport's public API.
 - Rankings for 24h gainers/losers, 7-day movers, budget items, estimated traded value and a sale-price-range volatility measure.
-- Randomized, data-bound single-skin spotlights. Recently published skins are avoided for 48 hours when enough candidates are available, so rerunning the workflow does not keep choosing the same story.
+- Randomized, data-bound single-skin spotlights. Recently published skins are avoided for 48 hours when fresh candidates exist.
 - Stored point-in-time snapshots. Exact 24-hour and 7-day comparison prices are only reported after enough history has been collected. A nearest sample within eight hours of the target is used to tolerate scheduled-run delays.
-- One Short per run: 1080x1920 MP4, 30–42 seconds, generated speech, sentence-level captions, three changing scenes (skin hook, market facts, price chart/CTA), and gradual zoom movement in each scene.
+- One Short per run: 1080x1920 MP4, natural-length narration (normally about 18–30 seconds), readable captions, and a new full-screen market-news beat about every two seconds.
+- Story arc: open with a market question or signal, show the evidence, reveal the skin after the hook, compare listings with completed-sale statistics, then ask viewers for a specific buy/sell/wait call.
+- Full-bleed financial-news graphics with a consistent market identity, source labels, a progressive price chart, positive/negative signal colors, number-led hierarchy, and a composed fallback when item artwork is unavailable.
 - Automated title, description and tags; upload through YouTube Data API OAuth refresh tokens.
 - SQLite market history persisted in the Git repository by the workflow; snapshots older than the retention setting are removed.
 - Retry handling, HTTP timeouts, 429/5xx retries, error logs, upload switch and rendering checks.
 
-The script generator is deterministic and uses only fetched prices and calculated metrics. It does not call a paid LLM or invent catalysts, trader sentiment, or future returns. This keeps the videos automatic without making unsupported claims. It labels the content as market information, not financial advice.
+The script generator is deterministic and uses only fetched prices and calculated metrics. It does not call a paid LLM or invent catalysts, trader sentiment, or future returns. The first spoken hook intentionally avoids naming the skin; the item is revealed after the opening signal. A lowest listing is labeled separately from the average completed sale, and the video states that market data is not a forecast.
+
+See [ARCHITECTURE-REPORT.md](ARCHITECTURE-REPORT.md) for the pre-change review, bottlenecks, and scope limitations. The uploaded archive is a patch, not a complete standalone repository: it omits `config.py`, `providers/skinport.py`, `youtube.py`, the package entry point, and packaging/setup files referenced below. Overlay the updated files onto the existing production repository; an isolated build cannot be verified from this archive alone.
 
 ## Data source and metric limits
 
@@ -96,6 +100,10 @@ The history database is kept in Git to avoid relying on expiring Actions caches.
 
 ## Test and operational checks
 
-`pytest -q` tests the ranking filters and historical comparison logic. The renderer probes the final MP4 to enforce portrait dimensions and 30–45 second duration. A production smoke test still requires authorized live API access, Edge-TTS network access, FFmpeg, and a real YouTube OAuth token; the local test suite deliberately does not upload or contact the marketplace.
+`pytest -q` tests ranking behavior and the script's opening-hook/data wording. The renderer probes the final MP4 to enforce portrait dimensions and a 12–45 second duration. A production smoke test still requires the omitted repository modules, authorized live API access, Edge-TTS or Piper, FFmpeg, and a real YouTube OAuth token; tests do not upload or contact the marketplace.
+
+## Retention measurement
+
+The redesign is a creative hypothesis, not a measured retention result. Compare it with the previous format using YouTube Analytics: viewed-vs-swiped, average view duration, average percentage viewed, completion, comments per view, and shares per view. Review results by topic and hook style after enough impressions; do not infer a lift from one upload. Keep the current scheduled publishing workflow while collecting the baseline and follow-up metrics.
 
 Monitor Actions failures, Skinport's API docs and rate limits, YouTube quota, and the OAuth consent-screen state. If a source is empty, malformed, throttled, or unavailable, the run fails rather than publishing made-up or stale prices. Edge-TTS is a free online service without an uptime guarantee; it is not an offline TTS engine.

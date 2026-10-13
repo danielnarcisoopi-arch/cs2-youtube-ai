@@ -14,62 +14,101 @@ class VideoCopy:
     featured: dict[str, Any]
 
 
+def _money(value: float | int | None, currency: str) -> str:
+    return f"{currency} {value:,.2f}" if value is not None else "unavailable"
+
+
+def _hook(topic: str, item: dict[str, Any], currency: str) -> tuple[str, str, str]:
+    """Return an open-loop hook, delayed item reveal, and evidence-led takeaway."""
+    name = item["name"]
+    change = item.get("change_24h_pct")
+    weekly = item.get("change_7d_pct")
+    average = item.get("avg_sale_24h")
+    low = item.get("min_sale_24h")
+    high = item.get("max_sale_24h")
+    spread = item.get("volatility_pct")
+
+    if topic == "gainers":
+        hook = (f"A CS2 skin is up {change:+.1f} percent in the tracked 24-hour window."
+                if change is not None else "One CS2 price move is drawing attention. Here is the evidence.")
+        reveal = f"The item is {name}."
+        takeaway = f"Reported sales were {item.get('volume_24h', 0):,} in 24 hours."
+    elif topic == "losers":
+        hook = (f"This CS2 market move is down {abs(change):.1f} percent. Is activity confirming it?"
+                if change is not None else "A lower price can hide a quieter market. Let's check the data.")
+        reveal = f"The item is {name}."
+        takeaway = f"Skinport reports {item.get('volume_24h', 0):,} sales in 24 hours."
+    elif topic == "budget":
+        hook = f"Under {currency} 20, but is anyone actually trading it?"
+        reveal = f"Today's active budget pick is {name}."
+        takeaway = f"It recorded {item.get('volume_24h', 0):,} reported sales in 24 hours."
+    elif topic == "weekly":
+        hook = (f"A CS2 skin shifted {weekly:+.1f} percent over the tracked week."
+                if weekly is not None else "A full week can tell a different story from one day's price.")
+        reveal = f"The item is {name}."
+        takeaway = f"The comparison uses the nearest stored snapshot to seven days ago."
+    elif topic == "dollar_volume":
+        hook = "This CS2 item is moving serious marketplace value. What is driving the number?"
+        reveal = f"The item is {name}."
+        traded = (average or 0) * item.get("volume_24h", 0)
+        takeaway = f"Estimated 24-hour traded value is about {_money(traded, currency)}."
+    elif topic == "volatility":
+        hook = (f"The reported sale prices span {spread:.1f} percent of the average. That's a wide range."
+                if spread is not None else "The gap between low and high sale prices can change the story.")
+        reveal = f"The item is {name}."
+        if low is not None and high is not None:
+            takeaway = f"Reported sales ranged from {_money(low, currency)} to {_money(high, currency)}."
+        else:
+            takeaway = f"The reported 24-hour sales average was {_money(average, currency)}."
+    else:
+        hook = "A low listing and a real sale are two different market signals."
+        reveal = f"Today's CS2 watch item is {name}."
+        takeaway = f"It has {item.get('quantity', 0):,} current listings and {item.get('volume_24h', 0):,} reported sales."
+
+    price_line = f"The lowest current listing is {_money(item.get('price'), currency)}."
+    if average is not None:
+        price_line += f" The reported 24-hour sale average is {_money(average, currency)}."
+    cta = "Would you buy, sell, or wait? Comment with your call—and why."
+    # Keep one short data caveat instead of repeating disclaimers in the voiceover.
+    caveat = "Snapshot data can move quickly; this is market information, not a forecast."
+    return hook, reveal, " ".join(part for part in (takeaway, price_line, caveat, cta) if part)
+
+
 def build_copy(topic: str, rows: list[dict[str, Any]], currency: str, spotlight: bool = False) -> VideoCopy:
     if not rows:
         raise ValueError("No credible rows for script")
     item = rows[0]
     name = item["name"]
-    pct24 = item.get("change_24h_pct")
-    pct7 = item.get("change_7d_pct")
-    if topic == "gainers":
-        title = f"CS2 Skin Watch: {name} {pct24:+.1f}% in 24h" if pct24 is not None else f"CS2 Market Watch: {name}"
-        hook = f"The {name} is among today's tracked gainers, up {abs(pct24):.1f} percent in 24 hours." if pct24 is not None else f"The {name} is one of today's tracked CS2 market movers."
-        intro = "This is a single-skin spotlight based on today's Skinport market snapshot." if spotlight else "Here are today's leading CS2 skin gainers, ranked using Skinport listing snapshots."
-    elif topic == "losers":
-        title = f"CS2 Skin Watch: {name} {pct24:.1f}% in 24h" if pct24 is not None else f"CS2 Market Watch: {name}"
-        hook = f"The {name} is among today's tracked decliners, down {abs(pct24):.1f} percent in 24 hours." if pct24 is not None else f"The {name} is among the most watched items today."
-        intro = "This is a single-skin spotlight based on today's Skinport market snapshot." if spotlight else "Here are the biggest tracked CS2 skin price drops from the last 24 hours."
-    elif topic == "budget":
-        title = f"Under {currency} 20 Skin Watch: {name}" if spotlight else f"CS2 Skins Under {currency} 20 to Watch Today"
-        hook = f"Looking for CS2 skins under 20 {currency}? The {name} is one of today's most actively traded budget picks."
-        intro = "This budget skin has recent Skinport sales activity. A low price alone does not make it a good investment." if spotlight else "These lower-priced skins have recent Skinport sales activity. A low price alone does not make an item a good investment."
-    elif topic == "weekly":
-        title = f"CS2 Skin Weekly Movers: {name} {pct7:+.1f}%" if pct7 is not None else f"CS2 Market Watch: {name}"
-        hook = f"Over the tracked seven-day window, the {name} moved {pct7:+.1f} percent." if pct7 is not None else f"The {name} is on today's CS2 watchlist."
-        intro = "This is one skin from our rolling seven-day market watchlist." if spotlight else "Here are notable CS2 skin moves across our rolling seven-day snapshot window."
-    elif topic == "dollar_volume":
-        title = f"CS2 Trading Activity Spotlight: {name}" if spotlight else "CS2 Market: Highest Traded Value Today"
-        hook = f"The {name} is among the highest traded-value CS2 skins today on Skinport."
-        intro = "This spotlight estimates traded value from average sale price multiplied by reported 24-hour sales volume." if spotlight else "This ranking estimates traded value from average sale price multiplied by reported 24-hour sales volume."
-    elif topic == "volatility":
-        title = f"CS2 Volatility Watch: {name}" if spotlight else "CS2 Skins With the Widest Price Range Today"
-        hook = f"The {name} had one of the widest reported sale-price ranges in today's Skinport data."
-        intro = "This volatility spotlight compares the reported low-to-high sale-price range with the item's average sale price over 24 hours." if spotlight else "This volatility list compares the reported low-to-high sale-price range with each item's average sale price over 24 hours."
-    else:
-        title = f"CS2 Skins With the Most Market Activity Today"
-        hook = f"The {name} is seeing strong activity compared with its current Skinport listing count."
-        intro = "This is an activity watchlist, not a price-volatility ranking."
-    lines = []
-    for i, r in enumerate(rows[:5]):
-        line = (f"Current listing: {r['name']}, {currency} {r['price']:.2f}" if spotlight
-                else f"Number {i + 1}: {r['name']}, {currency} {r['price']:.2f}")
-        if topic == "volatility" and r.get("volatility_pct") is not None:
-            line += f", price range {r['volatility_pct']:.1f} percent of average."
-        elif topic == "weekly" and r.get("change_7d_pct") is not None:
-            line += f", {r['change_7d_pct']:+.1f} percent in seven days."
-        elif r.get("change_24h_pct") is not None:
-            line += f", {r['change_24h_pct']:+.1f} percent in 24 hours."
-        else:
-            line += "."
-        lines.append(line)
-    narration = " ".join([hook, intro, *lines,
-        "Prices and sales can change quickly, and marketplace fees affect what sellers receive.",
-        "This is market information, not financial advice. Would you buy, sell, or wait? Comment below."])
-    hashtags = "#CS2 #CS2Skins #Skinport #SkinTrading #CounterStrike2"
-    description = (f"Market snapshot in {currency}, sourced from Skinport public market data. "
-                   "Percentage changes compare our nearest stored snapshots around 24 hours or 7 days apart. "
-                   "Budget and volume rankings use reported marketplace sales data. This is informational content, not financial advice.\n\n"
-                   "Item images: https://github.com/ByMykel/CSGO-API. "
-                   "Fallback narration voice: Piper with LibriTTS-R (CC BY 4.0).\n"
-                   f"Data source: https://skinport.com/\n{hashtags}")
-    return VideoCopy(title[:100], description, ["CS2", "CS2 skins", "skin trading", "Skinport", "Counter-Strike 2"], narration, topic, item)
+    hook, reveal, evidence = _hook(topic, item, currency)
+
+    # The first sentence is deliberately data-led and contains no skin name.
+    narration = " ".join((hook, reveal, evidence))
+    labels = {
+        "gainers": "CS2 MARKET ALERT",
+        "losers": "CS2 PRICE CHECK",
+        "budget": f"CS2 UNDER {currency} 20",
+        "weekly": "CS2 WEEKLY SIGNAL",
+        "dollar_volume": "CS2 MARKET FLOW",
+        "volatility": "CS2 VOLATILITY WATCH",
+    }
+    title_prefix = labels.get(topic, "CS2 MARKET WATCH")
+    # The title can name the item for search; the opening video beat still delays it.
+    title = f"{title_prefix}: {name}"
+    description = (
+        f"A concise CS2 skin market snapshot in {currency}, based on Skinport public market data. "
+        "Lowest listing prices are not sale prices. Historical changes compare the current snapshot "
+        "with the nearest stored snapshot around the stated period; traded value is an estimate. "
+        "Market information only, not a forecast or financial advice.\n\n"
+        "Item images: https://github.com/ByMykel/CSGO-API.\n"
+        "Fallback narration voice: Piper with LibriTTS-R (CC BY 4.0).\n"
+        "Data source: https://skinport.com/\n"
+        "#CS2 #CS2Skins #Skinport #SkinTrading #CounterStrike2"
+    )
+    return VideoCopy(
+        title=title[:100],
+        description=description,
+        tags=["CS2", "CS2 skins", "skin trading", "Skinport", "Counter-Strike 2"],
+        narration=narration,
+        topic=topic,
+        featured=item,
+    )
