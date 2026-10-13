@@ -18,43 +18,45 @@ def sample(**changes):
     return row
 
 
-def test_opening_hook_creates_a_question_before_naming_the_item():
-    video = build_copy("gainers", [sample()], "EUR", spotlight=True)
-    hook, reveal = video.narration.split("The item is ", 1)
+def test_hook_builds_curiosity_before_revealing_skin_name():
+    video = build_copy("gainers", [sample()], "EUR")
+    hook, reveal = video.narration.split("This is the ", 1)
     assert "AK-47" not in hook
-    assert hook.startswith("A tracked CS2 skin is up")
-    assert reveal.startswith("AK-47")
-    assert "The item is AK-47" in video.narration
+    assert "up twelve point four percent" in hook
+    assert "AK forty-seven Redline" in reveal
 
 
-def test_listing_and_sale_statistics_are_distinguished():
-    video = build_copy("market_watch", [sample()], "EUR")
-    assert "lowest current listing is EUR 21.50" in video.narration
-    assert "reported 24-hour sale average is EUR 20.75" in video.narration
-    assert "not a forecast" in video.narration
+def test_voice_copy_is_short_conversational_and_ends_with_a_question():
+    video = build_copy("budget", [sample()], "EUR")
+    assert len(video.narration.split()) <= 35
+    assert video.narration.endswith("Would you add it to your loadout?")
+    assert "not a forecast" not in video.narration
 
 
-def test_missing_history_does_not_invent_a_price_change():
-    video = build_copy("weekly", [sample(change_7d_pct=None)], "EUR")
-    assert "NO STORED COMPARISON" not in video.narration
-    assert "full week" in video.narration
-    hook = video.narration.split("The item is ", 1)[0]
-    assert "%" not in hook
-
-
-def test_spotlight_voiceover_stays_short_and_ends_with_a_specific_prompt():
-    video = build_copy("budget", [sample()], "EUR", spotlight=True)
-    assert len(video.narration.split()) <= 70
-    assert video.narration.endswith("Comment with your call—and why.")
-
-
-def test_price_gap_variant_uses_only_the_computed_listing_and_sale_average():
+def test_price_gap_variant_uses_actual_ask_sale_gap_and_delays_skin_name():
     video = build_copy("gainers", [sample()], "EUR", hook_variant="price_gap")
-    hook, reveal = video.narration.split("The item is ", 1)
-    assert "3.6 percent above the reported 24-hour sale average" in hook
+    hook, reveal = video.narration.split("It's the ", 1)
     assert "AK-47" not in hook
-    assert reveal.startswith("AK-47")
+    assert "three point six percent" in reveal
+    assert "AK forty-seven Redline" in reveal
     assert video.hook_variant == "price_gap"
+
+
+def test_unknown_history_does_not_fabricate_a_market_move():
+    video = build_copy("weekly", [sample(change_7d_pct=None)], "EUR")
+    assert "percent this week" not in video.narration
+    assert "full week" not in video.narration
+
+
+def test_five_skin_showcase_keeps_skin_names_out_of_the_voiceover():
+    rows = [sample(name=f"AK-47 | Skin {number} (Field-Tested)", price=number + 1.0)
+            for number in range(5)]
+    video = build_copy("budget", rows, "EUR")
+    assert video.title.startswith("5 CS2 Skins:")
+    assert len(video.items) == 5
+    assert all(row["name"] not in video.narration for row in rows)
+    assert "Five affordable CS2 skins" in video.narration
+    assert video.narration.endswith("Tell me below.")
 
 
 def test_unsupported_hook_variant_fails_clearly():

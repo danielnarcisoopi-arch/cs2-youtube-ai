@@ -28,12 +28,19 @@ class MarketStore:
             video_id TEXT NOT NULL, title TEXT NOT NULL, item_key TEXT NOT NULL,
             hook_variant TEXT NOT NULL DEFAULT 'market_move', duration_seconds REAL
         );
+        CREATE TABLE IF NOT EXISTS published_items (
+            video_id TEXT NOT NULL, item_key TEXT NOT NULL, topic TEXT NOT NULL,
+            published_at TEXT NOT NULL, PRIMARY KEY(video_id,item_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_published_items_recent ON published_items(published_at,item_key);
         """)
         published_columns = {row["name"] for row in self.db.execute("PRAGMA table_info(published)")}
         if "hook_variant" not in published_columns:
             self.db.execute("ALTER TABLE published ADD COLUMN hook_variant TEXT NOT NULL DEFAULT 'market_move'")
         if "duration_seconds" not in published_columns:
             self.db.execute("ALTER TABLE published ADD COLUMN duration_seconds REAL")
+        self.db.execute("""INSERT OR IGNORE INTO published_items(video_id,item_key,topic,published_at)
+            SELECT video_id,item_key,topic,published_at FROM published""")
         self.db.commit()
 
     def close(self) -> None:
@@ -85,22 +92,29 @@ class MarketStore:
 
     def already_published(self, item_key: str, topic: str, within_hours: int = 18) -> bool:
         since = (datetime.now(timezone.utc) - timedelta(hours=within_hours)).isoformat(timespec="seconds")
-        return self.db.execute("SELECT 1 FROM published WHERE item_key=? AND topic=? AND published_at>=? LIMIT 1",
+        return self.db.execute("SELECT 1 FROM published_items WHERE item_key=? AND topic=? AND published_at>=? LIMIT 1",
                                (item_key, topic, since)).fetchone() is not None
 
     def recently_published_items(self, within_hours: int = 48) -> set[str]:
         """Return featured items published recently, independent of topic."""
         since = (datetime.now(timezone.utc) - timedelta(hours=within_hours)).isoformat(timespec="seconds")
-        rows = self.db.execute("SELECT DISTINCT item_key FROM published WHERE published_at>=?", (since,)).fetchall()
+        rows = self.db.execute("SELECT DISTINCT item_key FROM published_items WHERE published_at>=?", (since,)).fetchall()
         return {str(row["item_key"]) for row in rows}
 
-    def record_published(self, topic: str, video_id: str, title: str, item_key: str,
+    def record_published(self, topic: str, video_id: str, title: str, item_key: str | list[str],
                          hook_variant: str = "market_move", duration_seconds: float | None = None) -> None:
+        item_keys = [item_key] if isinstance(item_key, str) else list(dict.fromkeys(item_key))
+        if not item_keys:
+            raise ValueError("At least one published skin is required")
+        published_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
         self.db.execute("""INSERT INTO published
             (published_at,topic,video_id,title,item_key,hook_variant,duration_seconds)
             VALUES(?,?,?,?,?,?,?)""",
-            (datetime.now(timezone.utc).isoformat(timespec="seconds"), topic, video_id,
-             title, item_key, hook_variant, duration_seconds))
+            (published_at, topic, video_id,
+             title, item_keys[0], hook_variant, duration_seconds))
+        self.db.executemany("""INSERT OR IGNORE INTO published_items
+            (video_id,item_key,topic,published_at) VALUES(?,?,?,?)""",
+            [(video_id, key, topic, published_at) for key in item_keys])
         self.db.commit()
 
 

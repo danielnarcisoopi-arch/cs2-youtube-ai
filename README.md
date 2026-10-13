@@ -1,22 +1,22 @@
 # CS2 Market Shorts
 
-A Python + FFmpeg pipeline that reads CS2 skin-market data, turns one verified market signal into a short vertical news story, and uploads through YouTube OAuth.
+A Python + FFmpeg pipeline that turns verified CS2 skin-market rankings into a clean top-five vertical showcase and uploads through YouTube OAuth.
 
 ## What is implemented
 
 - Live catalog prices, listing counts, 24-hour sale volume, and 24-hour/7-day sale aggregates from Skinport's public API.
 - Rankings for 24h gainers/losers, 7-day movers, budget items, estimated traded value and a sale-price-range volatility measure.
-- Randomized, data-bound single-skin spotlights. Recently published skins are avoided for 48 hours when fresh candidates exist.
+- Topic selection remains data-driven; the five strongest fresh skins from that ranking are shown in sequence. Recently published skins are avoided for 48 hours when fresh candidates exist.
 - Stored point-in-time snapshots. Exact 24-hour and 7-day comparison prices are only reported after enough history has been collected. A nearest sample within eight hours of the target is used to tolerate scheduled-run delays.
-- One Short per run: 1080x1920 MP4, natural-length narration (normally about 18–30 seconds), readable captions, and a new full-screen market-news beat about every two seconds.
-- Story arc: open with a market question or signal, show the evidence, reveal the skin after the hook, compare listings with completed-sale statistics, then ask viewers for a specific buy/sell/wait call.
-- Two data-bound opening variants (market move and ask-versus-sale gap) are randomly assigned and recorded in the run JSON and SQLite publish history for later comparison.
-- Full-bleed financial-news graphics with a consistent market identity, moving data ticker, progressive price chart with timestamp endpoints, positive/negative signal colors, and a clean item-art hero.
+- One Short per run: 1080x1920 MP4, short conversational narration, minimal on-screen copy, and a new visual beat about every two seconds.
+- Story arc: a short top-five hook, one item per visual beat with its exact name and current listing price, then one specific question for viewers.
+- Topic, selected items, and hook variant remain recorded in the run JSON and SQLite publish history.
+- Minimal, full-bleed weapon showcases: exact-match skin art, one market point at a time, slow camera movement, and a restrained original music bed. No transcript captions, repeating ticker, grid, dense data panel, or all-screen disclaimer.
 - Automated title, description and tags; upload through YouTube Data API OAuth refresh tokens.
 - SQLite market history persisted in the Git repository by the workflow; snapshots older than the retention setting are removed.
 - Retry handling, HTTP timeouts, 429/5xx retries, error logs, upload switch and rendering checks.
 
-The script generator is deterministic and uses only fetched prices and calculated metrics. It does not call a paid LLM or invent catalysts, trader sentiment, or future returns. The first spoken hook intentionally avoids naming the skin; the item is revealed after the opening signal. A lowest listing is labeled separately from the average completed sale, and the video states that market data is not a forecast.
+The script generator is deterministic and uses only fetched prices and calculated metrics. It does not call an LLM or invent catalysts, trader sentiment, or future returns. The voice gives a short introduction and CTA instead of reading five names and prices aloud. Skin names and prices appear on their own visual beats.
 
 See [ARCHITECTURE-REPORT.md](ARCHITECTURE-REPORT.md) for the pre-change review, bottlenecks, and scope limitations. The uploaded archive is a patch, not a complete standalone repository: it omits `config.py`, `providers/skinport.py`, `youtube.py`, the package entry point, and packaging/setup files referenced below. Overlay the updated files onto the existing production repository; an isolated build cannot be verified from this archive alone.
 
@@ -28,9 +28,11 @@ The current price is the lowest Skinport listing (`min_price`; suggested price i
 
 Steam Community Market does not provide a documented, stable public API for this complete feed. CSFloat's documented API uses API-key authentication and does not replace Skinport's free full-catalog price-history feed. The provider interface is isolated so additional authorized APIs can be added without changing the renderer or ranking calculations. No private endpoints or bot/CAPTCHA bypass are used.
 
-The featured item's picture is matched by exact market name against the public ByMykel/CSGO-API item catalog. Marketplace page previews are not used because they can include extra text and UI. If exact catalog art is unavailable, the renderer uses a restrained text-led hero instead of displaying a cluttered page image. This is best-effort; check current image and game-asset terms before commercial use. Set `MARKET_IMAGE_FETCH=false` to turn image retrieval off.
+Every skin image is matched by exact market name against the public ByMykel/CSGO-API item catalog. Marketplace page previews are not used because they can include extra text and UI. If exact catalog art is unavailable for any selected skin, the render fails instead of publishing an incomplete list. This is best-effort; check current image and game-asset terms before commercial use. Keep `MARKET_IMAGE_FETCH=true` for skin showcases.
 
-Narration tries Edge-TTS first. If Microsoft's endpoint rejects the request (for example, HTTP 403), the workflow uses a downloaded Piper neural voice instead of the very robotic eSpeak fallback. The fallback model is `en_US-libritts_r-medium`; its model card identifies the LibriTTS-R dataset under CC BY 4.0, and the generated YouTube description credits it. The initial workflow setup downloads the model into `data/voices`.
+Narration uses a shorter, spoken script and a slower neural delivery. By default it uses Microsoft Edge neural voice `en-US-AriaNeural`, with local Piper as an automatic outage fallback. For a more natural premium voice, set the GitHub Actions secret `ELEVENLABS_API_KEY` and repository variable `ELEVENLABS_VOICE_ID`; when both exist the pipeline uses that voice first and falls back automatically if its request fails. Premium speech is billed by its provider, so the optional integration is off until you configure credentials. `CS2_MUSIC_PATH` can point at a music file you have rights to use; otherwise FFmpeg creates a quiet original ambient bed.
+
+The voice output is still synthesized. The premium option gives you a choice of higher-quality voice models, but a genuinely human performance requires recording a person. The project keeps its automatic fallback chain so a temporary voice-service outage does not stop a scheduled upload.
 
 ## Directory tree
 
@@ -57,7 +59,7 @@ cs2-shorts/
 
 ## Run locally
 
-Requirements: Python 3.11+, FFmpeg/ffprobe, a font installed on the OS, and network access to Skinport, Edge-TTS, the image catalog and Hugging Face for the Piper fallback voice.
+Requirements: Python 3.11+, FFmpeg/ffprobe, a font installed on the OS, and network access to Skinport, the image catalog, and the configured speech provider. The workflow downloads the Piper fallback model.
 
 ```bash
 python -m venv .venv
@@ -101,7 +103,7 @@ The history database is kept in Git to avoid relying on expiring Actions caches.
 
 ## Test and operational checks
 
-`pytest -q` tests ranking behavior, hook variants, listing/sale wording, and SQLite history migration. The renderer probes the final MP4 to enforce portrait dimensions and a 12–45 second duration. A production smoke test still requires the omitted repository modules, authorized live API access, Edge-TTS or Piper, FFmpeg, and a real YouTube OAuth token; tests do not upload or contact the marketplace.
+`pytest -q` tests ranking behavior, short hook/reveal scripts, listing/sale wording, and SQLite history migration. The renderer probes the final MP4 to enforce portrait dimensions and a 12–45 second duration. A production smoke test still requires the omitted repository modules, authorized live API access, speech service, FFmpeg, and a real YouTube OAuth token; tests do not upload or contact the marketplace.
 
 ## Retention measurement
 

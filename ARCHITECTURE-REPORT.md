@@ -1,70 +1,57 @@
-# CS2 Market Shorts — Architecture Review
+# CS2 Market Shorts — Review and Visual Redesign
 
 Review date: 13 October 2026  
-Scope: every file present in the uploaded ZIP (10 files, 48,502 bytes).
+Scope: every file in the supplied project archive, plus the two reference Shorts and the screenshot from the previous render.
 
-## Executive assessment
+## Assessment of the version shown
 
-**Current experience score: 3/10 for retention and premium market-news presentation.** The market-data handling is deliberately cautious, and the workflow has useful automation safeguards. The video experience is still a scripted three-poster slideshow: it announces the item in the opening, relies on generic copy, holds each graphic for roughly a third of the runtime, and uses slow zoom as its only motion. Those choices explain the automated-report feel.
+**Score: 3/10 for visual quality and retention potential.** The market data and unattended publishing structure are useful; the visual execution shown in the screenshot is crowded and broken. A clipped headline, scrolling ticker over the title, giant unrelated words, repeated figures, persistent labels, grid, large chart, disclaimer, and progress bar all compete for attention. The weapon—the subject—is missing from the frame. It reads like a data dashboard squeezed into a Short, not a skin showcase.
 
-This archive is not a complete runnable repository. `pipeline.py` imports `config`, `providers.skinport`, and `youtube`, but none are included. There is also no `__main__.py`, `pyproject.toml`, package initializer, `.env.example`, or YouTube OAuth helper despite the README describing them. Therefore production behavior in the omitted files, the full upload contract, and a true end-to-end build cannot be verified from this upload. The archive's update note itself instructs the reader to overlay its files onto an existing repo.
+The voice pipeline can fall back from an online neural voice to Piper. That protects daily automation, but the local fallback sounds more synthetic. The narration also reads too many figures and caveats, which makes any voice sound more mechanical. There was no music bed in the renderer.
 
-## Verified architecture and data flow
+## Architecture and production boundary
 
-1. `.github/workflows/publish.yml` runs on manual dispatch and a four-times-daily UTC schedule. It installs FFmpeg/fonts and Python dependencies, expects the YouTube token secret, downloads Piper voice data, runs `python -m cs2_shorts`, commits `data/market.sqlite3`, and stores MP4/JSON artifacts for 14 days.
-2. `pipeline.py` asks `SkinportProvider` for market rows, persists snapshots in SQLite, calculates rankings, avoids spotlight items published in the last 48 hours, and selects one featured item. It builds copy, retrieves that item's recent stored prices, renders an MP4, saves metadata, then optionally uploads and records the published video. The workflow and upload code itself is present only in part; `youtube.py` is absent.
-3. `storage.py` stores market snapshots and upload history, then compares current prices with the nearest earlier snapshot within an eight-hour window around 24-hour and seven-day targets.
-4. `analytics.py` filters and ranks movers, budget items, traded-value estimates, and a range-based volatility proxy. `choose_spotlight` randomizes among ranked rows while preferring items outside the recent-publication set.
-5. `scripts.py` deterministically writes one generic title, hook, informational body, repeated rank-style lines, disclaimer, description, and tags. There is **no prompt, LLM call, or AI script generation** in the supplied code. The perceived AI style comes from the formulaic template and visual repetition, not generated prose from a model.
-6. `media.py` tries to match an exact market name to the public ByMykel item catalog, then tries Skinport OpenGraph art, then draws a fallback. Matplotlib creates a price chart; Pillow creates three static 1080×1920 scene cards; Edge-TTS is attempted twice before a Piper neural fallback. FFmpeg loops each card, applies a slow zoom, concatenates the three scenes, burns approximate sentence-weighted SRT captions, normalizes audio, and probes output dimensions/duration.
-7. `tests/test_analytics.py` tests ranking and random-item behavior only. There are no tests for copy validity, captions, scene timing, renderer filters, fallback art, audio, or pipeline/upload integration.
+The scheduled workflow runs four times each day and continues to call the existing pipeline. `pipeline.py` selects a market story, stores history, creates copy, renders a Short, writes metadata, and optionally uploads it. `storage.py` records snapshots and uploads; `analytics.py` ranks available signals. The workflow file preserves the same schedule, publication secret, history commit, and artifact retention.
 
-## Why the output looks automated
+This uploaded archive is a patch rather than the complete production checkout. It omits modules imported by the pipeline, including `config.py`, `providers/skinport.py`, `youtube.py`, the package entry point, and packaging files. The existing upload implementation and live credentials are therefore outside the files available for this change. I preserved the workflow contract but could not run a real scheduled upload from this archive.
 
-- **The hook spends the first seconds naming the item.** In each spotlight topic, the item name appears in narration immediately and is rendered on scene one. There is no open loop, surprising metric, or delayed reveal.
-- **Only three static compositions exist.** The full 30–42 seconds are divided between three cards; each is a static Pillow image with a mild zoom. There are no 2-second visual beats, ticker updates, chart drawing, number rollups, price markers, or transitions beyond hard cuts.
-- **Every video follows the same visual grammar.** A rounded dark card, teal brand label, large skin image, and a set of boxes are reused. The index/topic may change but the scene sequence and hierarchy do not.
-- **The text is designed like a poster, not broadcast graphics.** Long names, labels, disclaimer text, and metrics compete for space. The same color accents and large all-caps headings flatten the hierarchy. No safe-area or title-fit validation exists.
-- **The image is unreliable as the hero.** A failed lookup falls back to text in a box. Even successful image retrieval is a single catalog render, with no controlled crop, depth, or integrated price context.
-- **Chart design is static and weakly connected to the story.** The chart is exported as a transparent Matplotlib image, offers only first/last date ticks, and does not identify the selected price observation or animate the move. Sparse history becomes generic placeholder text.
-- **Narration is a ranking readout.** Openings such as “The [skin] is among today's tracked gainers” sound generated; the script then reads listing/sales facts and closes with a repeated generic question. It does not build tension or make the comment prompt specific to the actual data.
-- **Captions are approximate.** Sentence text is split into up to nine-word chunks and timed only by word count across the total audio duration. The captions are not aligned to actual speech. Font size, contrast, line width, and active-word emphasis are fixed.
-- **Narration duration is normalized by changing playback speed.** `atempo` makes the audio fit a 32–42 second target. That can make otherwise acceptable voices sound unnatural, especially for short scripts.
-- **No measured retention loop exists.** The project does not capture view duration, viewed-vs-swiped, completion, comments, or topic-level performance. Random selection avoids recent items but does not learn which story structures retain viewers.
-- **Market-data limitations are not surfaced in the visual itself.** A lowest listing price can be mistaken for a sale price or fair value. The prose contains caveats, but the graphics do not persistently label listing vs sales data or show the comparison window.
-- **The render is unnecessarily expensive.** Each of three 1080×1920 backgrounds is painted pixel-by-pixel in Python. It then loops images into FFmpeg and uses a global `zoompan`; the primary motion is a slow scale change and not content-aware.
+There are no text-generation prompts or LLM calls in the supplied code. Script generation is deterministic. The perceived AI quality came from repetitive copy and the same overloaded layout on every beat.
 
-## Bottlenecks by impact
+## Problems identified
 
-1. **Opening retention:** immediate skin-name reveal, generic declarative hook, no visible unresolved question.
-2. **Pacing / visual refresh:** only three cards for a 30–42 second runtime; changes are much slower than the requested two-second cadence.
-3. **Template originality:** repeated card layout and predictable copy across topics.
-4. **Story selection:** selection is randomized across ranks, not prioritized by meaningful, explainable story strength; a random featured row may not represent its category's strongest fact.
-5. **Narration quality:** long explanatory phrasing, repeated caveats, no pause/emphasis direction, speed fitting, and fallback quality uncertainty.
-6. **Data-to-visual connection:** no live marker, ticker, event beat, or clear distinction between current lowest listing and historical snapshot.
-7. **Measurement:** no structured experiments or YouTube Analytics feedback to test hook, length, CTA, and scene pacing.
-8. **Build confidence:** missing imported modules prevent a full package run from this archive; current tests cover only analytics.
+- The opening used a generic heading and several competing numbers instead of one visual question.
+- Typography was clipped and overlapped; text had no reliable fitting or safe-area rules.
+- A ticker repeated figures already displayed elsewhere and crossed the top of the design.
+- The layout kept a grid, source labels, disclaimer, and progress bar on screen throughout the video.
+- The chart had too much furniture and claimed attention without advancing the skin story.
+- The skin artwork was too small or absent, and the marketplace preview route could include unwanted page UI.
+- The same card structure repeated. Slow zoom was the main movement, so scenes felt static.
+- Narration combined hook, item name, several exact metrics, a legal caveat, and a generic CTA.
+- TTS read prices and metric labels like a report; an outage could select the more synthetic Piper voice.
+- There was no background music or deliberate voice/music mix.
+- The 3D in-hand footage in the reference videos is not in this repository. Its available asset is a catalog image; true matching game footage needs licensed capture/3D assets that are not included.
+- Retention and swipe metrics are not collected here. A creative redesign cannot by itself prove a retention increase.
 
-## Redesign targets for implementation
+## What changed
 
-- Start with a data-led tension line (“This skin's listings just moved 18%—but sales tell a different story”), never the skin name. Only use claims that can be computed from supplied market data; if history is insufficient, use a factual curiosity hook without implying movement.
-- Reveal the exact skin after the opening beat; use an opening label, a delayed nameplate, then an evidence sequence and a specific comment choice.
-- Replace three posters with a timed sequence of short broadcast beats, refreshing the composition at least every two seconds: opening alert, number reveal, item reveal, listing/sales split, chart window, close/CTA. Use data-driven variations by topic while retaining automation.
-- Use a compact market-news system: dark ink canvas, restrained lime/green for positive, red for negative, warm neutral for context, grid/ticker motifs, large tabular figures, persistent source/window labels, and a compact branded bug. Avoid fake live quotes, fake trading terminals, or claims of financial certainty.
-- Improve voice pacing and captions without adding an LLM dependency. Keep scripts concise, use robust timing/readability rules, and avoid stretching the whole narration to a fixed duration.
-- Make image download and render work bounded and deterministic; cache reusable item artwork and avoid per-pixel Python loops.
-- Add tests for script invariants, required beat cadence, safe fallback copy, and renderer command construction. Do not claim retention gains without YouTube Analytics experiments.
+- Replaced the dashboard frame with a full-screen charcoal and soft-color composition. Removed the ticker, grid, repeated market labels, disclaimer, progress bar, chart boxes, and stacked stat cards.
+- Made the exact-match skin cutout the hero image, with a larger crop, soft shadow, clean reveal, and a few purposeful layouts. Marketplace page screenshots are not used.
+- Rebuilt each Short as a top-five sequence: a short hook, one exact skin image/name/price per beat, and a final question. Motion comes from quick beat changes and a subtle Ken Burns move.
+- Rewrote spoken copy as a short conversational list intro and question; skin names and prices stay on screen instead of being read like a list of statistics.
+- Slowed the default neural voice slightly and selected a different default voice. Kept the local voice fallback so the schedule can continue through an outage.
+- Added an optional premium TTS path. It runs only when both `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` are set; otherwise the pipeline uses its existing free voice chain. That provider bills for generated speech, so no paid request is made by default.
+- Added an original low-volume ambient bed generated by FFmpeg. `CS2_MUSIC_PATH` can select a cleared music file instead.
+- Kept upload scheduling, market data, SQLite storage, and daily automation intact.
+- Extended publish history with a child table for every skin in a video, so the 48-hour freshness rule covers all five items rather than only the first one.
 
-## Scope and confidence
+## Reference match and limits
 
-Findings about code in this ZIP are direct. Findings about omitted provider, configuration, entry point, OAuth uploader, and the deployed production environment are unknown. The requested goal of doubling average retention is a target, not something source edits alone can guarantee. It requires a baseline and YouTube Analytics measurement, followed by controlled iteration.
+The two examples use recorded in-game views with each weapon shown in a hand, on a map, in motion. The repository has no per-skin gameplay footage or 3D inspect models, so this patch cannot truthfully produce those exact camera angles. It uses the exact catalog weapon image and animates it in a cleaner cinematic composition. Add licensed, skin-matched game footage or a 3D asset/render service to get closer to the in-game reference.
 
-## Follow-up improvements applied
+The free TTS route remains synthetic, even with shorter dialogue. For the most natural unattended voice, configure the optional provider and choose a voice there. A human voice requires a recording. The generated music is deliberately understated and is not a substitute for a professionally produced soundtrack.
 
-1. **Stronger opening tests:** added a second hook format that compares the lowest current ask with the reported 24-hour sale average. Both variants are data-bound and keep the skin name out of the hook.
-2. **Cleaner skin artwork:** removed marketplace-page OpenGraph images, which may include page text and controls. The renderer now uses exact-name catalog artwork only; if unavailable, it uses a simple text-led hero. Catalog images are cached per item.
-3. **More motion:** added a continuously moving market ticker over the video, kept roughly two-second scene changes, and made the CTA the final beat at every supported duration.
-4. **Chart context:** chart graphics now label the observed price range and timestamp endpoints. Pipeline labels include date and time rather than date only.
-5. **Experiment records:** every run records its hook variant and the visible market facts in JSON. SQLite publish history stores hook variant and duration and migrates existing databases safely.
-6. **Story quality sampling:** the spotlight selector samples only the top five entries per ranking and weights the highest ranks more heavily, while keeping the 48-hour freshness preference.
-7. **Verification:** added a migration test and hook-variant tests. The local environment still lacks pytest, Edge TTS, and requests; rendering and production upload need verification in the complete repository with its installed dependencies and real data.
+## Verification and confidence
+
+Python syntax compilation succeeds. The environment does not include `pytest`, `requests`, or `edge-tts`, and the archive omits required production modules, so a full MP4 render, live neural-voice audition, marketplace fetch, and YouTube upload could not be verified here. The configured paid voice route also requires the user's own provider credentials and voice selection.
+
+The screenshot supports the 3/10 score for the previous render. No claim of doubled retention is made. Check the next render visually and compare viewed-versus-swiped, average view duration, average percentage viewed, comments, and shares in YouTube Analytics after enough impressions.

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -13,124 +13,135 @@ class VideoCopy:
     topic: str
     featured: dict[str, Any]
     hook_variant: str = "market_move"
+    items: list[dict[str, Any]] = field(default_factory=list)
 
 
-def _money(value: float | int | None, currency: str) -> str:
-    return f"{currency} {value:,.2f}" if value is not None else "unavailable"
+_ONES = ("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+         "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen",
+         "eighteen", "nineteen")
+_TENS = ("", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety")
 
 
-def _hook(topic: str, item: dict[str, Any], currency: str, variant: str) -> tuple[str, str, str]:
-    """Build one of two data-bound openings, then reveal the skin after the hook."""
-    name = item["name"]
+def _small_number(value: int) -> str:
+    if value < 20:
+        return _ONES[value]
+    if value < 100:
+        return _TENS[value // 10] + (f"-{_ONES[value % 10]}" if value % 10 else "")
+    if value < 1000:
+        return f"{_ONES[value // 100]} hundred" + (f" {_small_number(value % 100)}" if value % 100 else "")
+    return str(value)
+
+
+def _spoken_percent(value: float) -> str:
+    rounded = round(value, 1)
+    whole = int(abs(rounded))
+    decimal = round((abs(rounded) - whole) * 10)
+    number = _small_number(whole) + (f" point {_ONES[decimal]}" if decimal else "")
+    return f"{number} percent"
+
+
+def _spoken_name(name: str) -> str:
+    name = name.split("(", 1)[0].replace(" | ", " ").strip()
+    return name.replace("AK-47", "AK forty-seven").replace("M4A1-S", "M four A one S")
+
+
+def _market_move(item: dict[str, Any], topic: str, variant: str) -> tuple[str, str, str]:
     change = item.get("change_24h_pct")
     weekly = item.get("change_7d_pct")
-    average = item.get("avg_sale_24h")
-    low = item.get("min_sale_24h")
-    high = item.get("max_sale_24h")
-    spread = item.get("volatility_pct")
     price = item.get("price")
+    average = item.get("avg_sale_24h")
     gap = ((price / average) - 1) * 100 if price is not None and average and average > 0 else None
-
-    if topic == "gainers":
-        hook = (f"A tracked CS2 skin is up {change:+.1f} percent in 24 hours. "
-                "Are recent sales keeping pace?" if change is not None else
-                "One CS2 price move is drawing attention. Here is the evidence.")
-        reveal = f"The item is {name}."
-        takeaway = f"Reported sales were {item.get('volume_24h', 0):,} in 24 hours."
-    elif topic == "losers":
-        hook = (f"A tracked CS2 skin fell {abs(change):.1f} percent in 24 hours. "
-                "How active was the market?"
-                if change is not None else "A lower price can hide a quieter market. Let's check the data.")
-        reveal = f"The item is {name}."
-        takeaway = f"Skinport reports {item.get('volume_24h', 0):,} sales in 24 hours."
-    elif topic == "budget":
-        hook = f"The listing is {_money(item.get('price'), currency)}. Are buyers actually trading it?"
-        reveal = f"Today's active budget pick is {name}."
-        takeaway = f"It recorded {item.get('volume_24h', 0):,} reported sales in 24 hours."
-    elif topic == "weekly":
-        hook = (f"A tracked CS2 skin shifted {weekly:+.1f} percent over the week. "
-                "What does the recent sales data say?"
-                if weekly is not None else "A full week can tell a different story from one day's price.")
-        reveal = f"The item is {name}."
-        takeaway = f"The comparison uses the nearest stored snapshot to seven days ago."
-    elif topic == "dollar_volume":
-        traded = (average or 0) * item.get("volume_24h", 0)
-        hook = f"About {_money(traded, currency)} in estimated CS2 sales value. Is the activity broad or concentrated?"
-        reveal = f"The item is {name}."
-        takeaway = f"Estimated 24-hour traded value is about {_money(traded, currency)}."
-    elif topic == "volatility":
-        hook = (f"The reported sale prices span {spread:.1f} percent of the average. That's a wide range."
-                if spread is not None else "The gap between low and high sale prices can change the story.")
-        reveal = f"The item is {name}."
-        if low is not None and high is not None:
-            takeaway = f"Reported sales ranged from {_money(low, currency)} to {_money(high, currency)}."
-        else:
-            takeaway = f"The reported 24-hour sales average was {_money(average, currency)}."
-    else:
-        hook = (f"The lowest ask is {_money(item.get('price'), currency)}, while the reported sale average is "
-                f"{_money(average, currency)}. Those numbers tell different stories.")
-        reveal = f"Today's CS2 watch item is {name}."
-        takeaway = f"It has {item.get('quantity', 0):,} current listings and {item.get('volume_24h', 0):,} reported sales."
+    name = _spoken_name(item["name"])
 
     if variant == "price_gap" and gap is not None:
-        if gap >= 3:
-            hook = (f"The lowest ask is {gap:.1f} percent above the reported 24-hour sale average. "
-                    "That gap changes how this move looks.")
-        elif gap <= -3:
-            hook = (f"The lowest ask sits {abs(gap):.1f} percent below the reported 24-hour sale average. "
-                    "Here is what the market is showing.")
+        if gap >= 1:
+            hook = "The current ask is above recent sales. Here's the gap."
+            reveal = f"It's the {name}, listed {_spoken_percent(gap)} higher."
+        elif gap <= -1:
+            hook = "Recent sales are above the cheapest listing. Here's the gap."
+            reveal = f"It's the {name}, listed {_spoken_percent(gap)} lower."
         else:
-            hook = (f"The lowest ask and reported sale average are within {abs(gap):.1f} percent. "
-                    "Now check the broader move.")
-
-    price_line = f"The lowest current listing is {_money(item.get('price'), currency)}."
-    if average is not None:
-        price_line += f" The reported 24-hour sale average is {_money(average, currency)}."
-    cta = "Would you buy, sell, or wait? Comment with your call—and why."
-    # Keep one short data caveat instead of repeating disclaimers in the voiceover.
-    caveat = "Snapshot data can move quickly; this is market information, not a forecast."
-    return hook, reveal, " ".join(part for part in (takeaway, price_line, caveat, cta) if part)
+            hook = "The current ask and recent sales are almost level."
+            reveal = f"It's the {name}. The gap is less than one percent."
+        cta = "Would you pay the ask or wait?"
+    elif topic == "gainers" and change is not None:
+        hook = f"A CS2 skin is up {_spoken_percent(change)} in a day. Would you chase the move?"
+        reveal = f"This is the {name}."
+        cta = "Buy here, or wait for a pullback?"
+    elif topic == "losers" and change is not None:
+        hook = f"A CS2 skin is down {_spoken_percent(change)} today. Is this a dip or a warning?"
+        reveal = f"It's the {name}."
+        cta = "Would you buy the dip, or stay out?"
+    elif topic == "weekly" and weekly is not None:
+        direction = "up" if weekly >= 0 else "down"
+        hook = f"This skin is {direction} {_spoken_percent(abs(weekly))} this week. The daily chart can tell a different story."
+        reveal = f"We're looking at the {name}."
+        cta = "Is this momentum real, or would you wait?"
+    elif topic == "budget":
+        hook = "A low asking price is only interesting if people are trading it."
+        reveal = f"This is the {name}."
+        cta = "Would you add it to your loadout?"
+    elif topic == "volatility" and item.get("volatility_pct") is not None:
+        hook = "Recent sale prices have a wide spread."
+        reveal = f"It's the {name}, with a range equal to {_spoken_percent(item['volatility_pct'])} of the average sale."
+        cta = "Would you trade that spread, or pass?"
+    elif topic == "dollar_volume":
+        hook = "There's real activity around this skin. But is the price moving too?"
+        reveal = f"It's the {name}, with {item.get('volume_24h', 0)} reported sales in a day."
+        cta = "Would you trade it, or watch for now?"
+    else:
+        hook = "The cheapest listing and completed sales can tell two different stories."
+        reveal = f"Today's watch item is the {name}."
+        if gap is not None:
+            cta = f"The ask is {_spoken_percent(abs(gap))} {'above' if gap >= 0 else 'below'} the recent sale average. Would you buy or wait?"
+        elif change is not None:
+            cta = f"It's moved {_spoken_percent(change)} in a day. Would you buy or wait?"
+        else:
+            cta = "What would you do here: buy, sell, or wait?"
+    return hook, reveal, cta
 
 
 def build_copy(topic: str, rows: list[dict[str, Any]], currency: str, spotlight: bool = False,
                hook_variant: str = "market_move") -> VideoCopy:
     if not rows:
         raise ValueError("No credible rows for script")
-    item = rows[0]
-    name = item["name"]
     if hook_variant not in {"market_move", "price_gap"}:
         raise ValueError(f"Unsupported hook variant: {hook_variant}")
-    hook, reveal, evidence = _hook(topic, item, currency, hook_variant)
-
-    # The first sentence is deliberately data-led and contains no skin name.
-    narration = " ".join((hook, reveal, evidence))
+    items = rows[:5]
+    item = items[0]
+    if len(items) > 1:
+        count = _small_number(len(items))
+        hooks = {
+            "gainers": f"{count.capitalize()} CS2 skins are moving up today. I'll show the current ask for each one.",
+            "losers": f"{count.capitalize()} CS2 skins fell today. I'll show the current ask for each one.",
+            "budget": f"{count.capitalize()} affordable CS2 skins with recent market activity. I'll show today's price for each one.",
+            "weekly": f"{count.capitalize()} CS2 skins moved this week. Here's today's asking price for each.",
+            "dollar_volume": f"{count.capitalize()} CS2 skins with the most reported sales today. Here's the asking price for each.",
+            "volatility": f"{count.capitalize()} CS2 skins with wide reported sale ranges. Here's today's asking price for each.",
+        }
+        intro = hooks.get(topic, f"{count.capitalize()} CS2 skins to watch today. I'll show the current ask for each.")
+        narration = f"{intro} Take a close look at each finish. Which one would you equip? Tell me below."
+    else:
+        hook, reveal, cta = _market_move(item, topic, hook_variant)
+        # Three spoken beats, one short thought each. No ticker-like recital of metrics.
+        narration = " ".join((hook, reveal, cta))
+    name = item["name"]
     labels = {
-        "gainers": "CS2 MARKET ALERT",
-        "losers": "CS2 PRICE CHECK",
-        "budget": f"CS2 UNDER {currency} 20",
-        "weekly": "CS2 WEEKLY SIGNAL",
-        "dollar_volume": "CS2 MARKET FLOW",
-        "volatility": "CS2 VOLATILITY WATCH",
+        "gainers": "Biggest Movers Today", "losers": "Biggest Drops Today", "budget": "Budget Picks",
+        "weekly": "Weekly Movers", "dollar_volume": "Most Traded",
+        "volatility": "Wide Sale Ranges",
     }
-    title_prefix = labels.get(topic, "CS2 MARKET WATCH")
-    # The title can name the item for search; the opening video beat still delays it.
-    title = f"{title_prefix}: {name}"
+    title = (f"{len(items)} CS2 Skins: {labels.get(topic, 'Market Picks')}"
+             if len(items) > 1 else f"{labels.get(topic, 'CS2 MARKET WATCH')}: {name}")
     description = (
-        f"A concise CS2 skin market snapshot in {currency}, based on Skinport public market data. "
+        f"A quick CS2 skin market shortlist in {currency}, based on Skinport public market data. "
         "Lowest listing prices are not sale prices. Historical changes compare the current snapshot "
         "with the nearest stored snapshot around the stated period; traded value is an estimate. "
         "Market information only, not a forecast or financial advice.\n\n"
         "Item images: https://github.com/ByMykel/CSGO-API.\n"
-        "Fallback narration voice: Piper with LibriTTS-R (CC BY 4.0).\n"
         "Data source: https://skinport.com/\n"
         "#CS2 #CS2Skins #Skinport #SkinTrading #CounterStrike2"
     )
-    return VideoCopy(
-        title=title[:100],
-        description=description,
-        tags=["CS2", "CS2 skins", "skin trading", "Skinport", "Counter-Strike 2"],
-        narration=narration,
-        topic=topic,
-        featured=item,
-        hook_variant=hook_variant,
-    )
+    return VideoCopy(title[:100], description,
+                     ["CS2", "CS2 skins", "skin trading", "Skinport", "Counter-Strike 2"],
+                     narration, topic, item, hook_variant, items)

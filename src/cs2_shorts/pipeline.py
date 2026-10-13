@@ -6,7 +6,6 @@ import os
 import secrets
 from datetime import datetime, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from .analytics import choose_spotlight, rankings
 from .config import settings, validate_settings
@@ -37,21 +36,23 @@ def run() -> Path:
             topic, featured = choose_spotlight(rank, recent_items)
         except ValueError:
             raise RuntimeError("No items meet the minimum activity/data rules; refusing to fabricate a market story")
-        # Mix real themes/items; avoid repeating a featured skin for 48h when possible.
+        # Keep the topic selection, then turn its strongest fresh rows into a quick showcase list.
+        topic_rows = rank.get(topic, [])
+        fresh_rows = [row for row in topic_rows if row["name"] not in recent_items]
+        eligible = fresh_rows or topic_rows
+        showcase_rows = [featured, *[row for row in eligible if row["name"] != featured["name"]][:4]]
         hook_variant = secrets.choice(("market_move", "price_gap"))
-        copy = build_copy(topic, [featured], cfg.currency, spotlight=True, hook_variant=hook_variant)
+        copy = build_copy(topic, showcase_rows, cfg.currency, spotlight=True, hook_variant=hook_variant)
         featured_name = copy.featured["name"]
-        trend = store.db.execute("SELECT captured_at,price FROM snapshots WHERE name=? ORDER BY captured_at DESC LIMIT 40", (featured_name,)).fetchall()
-        chart_points = [(datetime.fromisoformat(r["captured_at"]).astimezone(ZoneInfo("Europe/Lisbon")).strftime("%d %b %H:%M"), r["price"])
-                        for r in reversed(trend)]
         run_id = os.getenv("GITHUB_RUN_ID") or secrets.token_hex(3)
         stamp = f"{now.strftime('%Y%m%d-%H%M')}-{run_id}"
         video_path = cfg.output_dir / f"{stamp}-{topic}.mp4"
-        duration = render_video(copy, cfg.currency, copy.featured.get("market_page"), chart_points,
-            cfg.data_dir / "render", video_path, cfg.voice, cfg.image_fetch, cfg.image_timeout)
+        duration = render_video(copy, cfg.currency, cfg.data_dir / "render", video_path,
+            cfg.voice, cfg.image_fetch, cfg.image_timeout)
         metadata = {"captured_at": captured_at, "topic": topic, "title": copy.title,
                     "duration_seconds": round(duration, 2), "currency": cfg.currency,
                     "market_source": "Skinport public REST API", "featured_item": featured_name,
+                    "featured_items": [row["name"] for row in copy.items],
                     "hook_variant": copy.hook_variant,
                     "current_lowest_listing": copy.featured.get("price"),
                     "reported_average_sale_24h": copy.featured.get("avg_sale_24h"),
@@ -65,7 +66,7 @@ def run() -> Path:
             video_id = upload_video(video_path, copy, cfg)
             metadata["youtube_video_id"] = video_id
             metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-            store.record_published(topic, video_id, copy.title, featured_name,
+            store.record_published(topic, video_id, copy.title, [row["name"] for row in copy.items],
                                    copy.hook_variant, duration)
             log.info("Publish URL: https://youtube.com/shorts/%s", video_id)
         return video_path
