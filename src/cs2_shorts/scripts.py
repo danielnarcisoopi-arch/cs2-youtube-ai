@@ -12,14 +12,15 @@ class VideoCopy:
     narration: str
     topic: str
     featured: dict[str, Any]
+    hook_variant: str = "market_move"
 
 
 def _money(value: float | int | None, currency: str) -> str:
     return f"{currency} {value:,.2f}" if value is not None else "unavailable"
 
 
-def _hook(topic: str, item: dict[str, Any], currency: str) -> tuple[str, str, str]:
-    """Return an open-loop hook, delayed item reveal, and evidence-led takeaway."""
+def _hook(topic: str, item: dict[str, Any], currency: str, variant: str) -> tuple[str, str, str]:
+    """Build one of two data-bound openings, then reveal the skin after the hook."""
     name = item["name"]
     change = item.get("change_24h_pct")
     weekly = item.get("change_7d_pct")
@@ -27,30 +28,35 @@ def _hook(topic: str, item: dict[str, Any], currency: str) -> tuple[str, str, st
     low = item.get("min_sale_24h")
     high = item.get("max_sale_24h")
     spread = item.get("volatility_pct")
+    price = item.get("price")
+    gap = ((price / average) - 1) * 100 if price is not None and average and average > 0 else None
 
     if topic == "gainers":
-        hook = (f"A CS2 skin is up {change:+.1f} percent in the tracked 24-hour window."
-                if change is not None else "One CS2 price move is drawing attention. Here is the evidence.")
+        hook = (f"A tracked CS2 skin is up {change:+.1f} percent in 24 hours. "
+                "Are recent sales keeping pace?" if change is not None else
+                "One CS2 price move is drawing attention. Here is the evidence.")
         reveal = f"The item is {name}."
         takeaway = f"Reported sales were {item.get('volume_24h', 0):,} in 24 hours."
     elif topic == "losers":
-        hook = (f"This CS2 market move is down {abs(change):.1f} percent. Is activity confirming it?"
+        hook = (f"A tracked CS2 skin fell {abs(change):.1f} percent in 24 hours. "
+                "How active was the market?"
                 if change is not None else "A lower price can hide a quieter market. Let's check the data.")
         reveal = f"The item is {name}."
         takeaway = f"Skinport reports {item.get('volume_24h', 0):,} sales in 24 hours."
     elif topic == "budget":
-        hook = f"Under {currency} 20, but is anyone actually trading it?"
+        hook = f"The listing is {_money(item.get('price'), currency)}. Are buyers actually trading it?"
         reveal = f"Today's active budget pick is {name}."
         takeaway = f"It recorded {item.get('volume_24h', 0):,} reported sales in 24 hours."
     elif topic == "weekly":
-        hook = (f"A CS2 skin shifted {weekly:+.1f} percent over the tracked week."
+        hook = (f"A tracked CS2 skin shifted {weekly:+.1f} percent over the week. "
+                "What does the recent sales data say?"
                 if weekly is not None else "A full week can tell a different story from one day's price.")
         reveal = f"The item is {name}."
         takeaway = f"The comparison uses the nearest stored snapshot to seven days ago."
     elif topic == "dollar_volume":
-        hook = "This CS2 item is moving serious marketplace value. What is driving the number?"
-        reveal = f"The item is {name}."
         traded = (average or 0) * item.get("volume_24h", 0)
+        hook = f"About {_money(traded, currency)} in estimated CS2 sales value. Is the activity broad or concentrated?"
+        reveal = f"The item is {name}."
         takeaway = f"Estimated 24-hour traded value is about {_money(traded, currency)}."
     elif topic == "volatility":
         hook = (f"The reported sale prices span {spread:.1f} percent of the average. That's a wide range."
@@ -61,9 +67,21 @@ def _hook(topic: str, item: dict[str, Any], currency: str) -> tuple[str, str, st
         else:
             takeaway = f"The reported 24-hour sales average was {_money(average, currency)}."
     else:
-        hook = "A low listing and a real sale are two different market signals."
+        hook = (f"The lowest ask is {_money(item.get('price'), currency)}, while the reported sale average is "
+                f"{_money(average, currency)}. Those numbers tell different stories.")
         reveal = f"Today's CS2 watch item is {name}."
         takeaway = f"It has {item.get('quantity', 0):,} current listings and {item.get('volume_24h', 0):,} reported sales."
+
+    if variant == "price_gap" and gap is not None:
+        if gap >= 3:
+            hook = (f"The lowest ask is {gap:.1f} percent above the reported 24-hour sale average. "
+                    "That gap changes how this move looks.")
+        elif gap <= -3:
+            hook = (f"The lowest ask sits {abs(gap):.1f} percent below the reported 24-hour sale average. "
+                    "Here is what the market is showing.")
+        else:
+            hook = (f"The lowest ask and reported sale average are within {abs(gap):.1f} percent. "
+                    "Now check the broader move.")
 
     price_line = f"The lowest current listing is {_money(item.get('price'), currency)}."
     if average is not None:
@@ -74,12 +92,15 @@ def _hook(topic: str, item: dict[str, Any], currency: str) -> tuple[str, str, st
     return hook, reveal, " ".join(part for part in (takeaway, price_line, caveat, cta) if part)
 
 
-def build_copy(topic: str, rows: list[dict[str, Any]], currency: str, spotlight: bool = False) -> VideoCopy:
+def build_copy(topic: str, rows: list[dict[str, Any]], currency: str, spotlight: bool = False,
+               hook_variant: str = "market_move") -> VideoCopy:
     if not rows:
         raise ValueError("No credible rows for script")
     item = rows[0]
     name = item["name"]
-    hook, reveal, evidence = _hook(topic, item, currency)
+    if hook_variant not in {"market_move", "price_gap"}:
+        raise ValueError(f"Unsupported hook variant: {hook_variant}")
+    hook, reveal, evidence = _hook(topic, item, currency, hook_variant)
 
     # The first sentence is deliberately data-led and contains no skin name.
     narration = " ".join((hook, reveal, evidence))
@@ -111,4 +132,5 @@ def build_copy(topic: str, rows: list[dict[str, Any]], currency: str, spotlight:
         narration=narration,
         topic=topic,
         featured=item,
+        hook_variant=hook_variant,
     )

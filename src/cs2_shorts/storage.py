@@ -25,9 +25,15 @@ class MarketStore:
         CREATE INDEX IF NOT EXISTS idx_snap_time ON snapshots(captured_at);
         CREATE TABLE IF NOT EXISTS published (
             id INTEGER PRIMARY KEY, published_at TEXT NOT NULL, topic TEXT NOT NULL,
-            video_id TEXT NOT NULL, title TEXT NOT NULL, item_key TEXT NOT NULL
+            video_id TEXT NOT NULL, title TEXT NOT NULL, item_key TEXT NOT NULL,
+            hook_variant TEXT NOT NULL DEFAULT 'market_move', duration_seconds REAL
         );
         """)
+        published_columns = {row["name"] for row in self.db.execute("PRAGMA table_info(published)")}
+        if "hook_variant" not in published_columns:
+            self.db.execute("ALTER TABLE published ADD COLUMN hook_variant TEXT NOT NULL DEFAULT 'market_move'")
+        if "duration_seconds" not in published_columns:
+            self.db.execute("ALTER TABLE published ADD COLUMN duration_seconds REAL")
         self.db.commit()
 
     def close(self) -> None:
@@ -88,9 +94,13 @@ class MarketStore:
         rows = self.db.execute("SELECT DISTINCT item_key FROM published WHERE published_at>=?", (since,)).fetchall()
         return {str(row["item_key"]) for row in rows}
 
-    def record_published(self, topic: str, video_id: str, title: str, item_key: str) -> None:
-        self.db.execute("INSERT INTO published(published_at,topic,video_id,title,item_key) VALUES(?,?,?,?,?)",
-                        (datetime.now(timezone.utc).isoformat(timespec="seconds"), topic, video_id, title, item_key))
+    def record_published(self, topic: str, video_id: str, title: str, item_key: str,
+                         hook_variant: str = "market_move", duration_seconds: float | None = None) -> None:
+        self.db.execute("""INSERT INTO published
+            (published_at,topic,video_id,title,item_key,hook_variant,duration_seconds)
+            VALUES(?,?,?,?,?,?,?)""",
+            (datetime.now(timezone.utc).isoformat(timespec="seconds"), topic, video_id,
+             title, item_key, hook_variant, duration_seconds))
         self.db.commit()
 
 

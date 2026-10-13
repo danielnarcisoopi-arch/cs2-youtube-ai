@@ -35,10 +35,16 @@ def choose_topic(ranks: dict[str, list[dict[str, Any]]], run_number: int = 0) ->
 
 
 def choose_spotlight(ranks: dict[str, list[dict[str, Any]]], recently_published: set[str], chooser=None) -> tuple[str, dict[str, Any]]:
-    """Pick a real ranked item at random, preferring skins not featured recently."""
+    """Sample from the strongest ranked stories, favoring fresh items and top ranks."""
     topics = ("gainers", "losers", "budget", "weekly", "dollar_volume", "volatility")
-    available = [(topic, item) for topic in topics for item in ranks.get(topic, [])]
+    available: list[tuple[str, dict[str, Any], int]] = []
+    for topic in topics:
+        for position, item in enumerate(ranks.get(topic, [])[:5]):
+            available.append((topic, item, 5 - position))
     if not available:
         raise ValueError("No ranked items are available for a spotlight")
-    fresh = [(topic, item) for topic, item in available if item["name"] not in recently_published]
-    return (chooser or secrets.choice)(fresh or available)
+    fresh = [candidate for candidate in available if candidate[1]["name"] not in recently_published]
+    pool = fresh or available
+    # Repeated entries represent higher sampling weight for the strongest rank.
+    weighted = [(topic, item) for topic, item, weight in pool for _ in range(weight)]
+    return (chooser or secrets.choice)(weighted)

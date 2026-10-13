@@ -38,10 +38,11 @@ def run() -> Path:
         except ValueError:
             raise RuntimeError("No items meet the minimum activity/data rules; refusing to fabricate a market story")
         # Mix real themes/items; avoid repeating a featured skin for 48h when possible.
-        copy = build_copy(topic, [featured], cfg.currency, spotlight=True)
+        hook_variant = secrets.choice(("market_move", "price_gap"))
+        copy = build_copy(topic, [featured], cfg.currency, spotlight=True, hook_variant=hook_variant)
         featured_name = copy.featured["name"]
         trend = store.db.execute("SELECT captured_at,price FROM snapshots WHERE name=? ORDER BY captured_at DESC LIMIT 40", (featured_name,)).fetchall()
-        chart_points = [(datetime.fromisoformat(r["captured_at"]).astimezone(ZoneInfo("Europe/Lisbon")).strftime("%d %b"), r["price"])
+        chart_points = [(datetime.fromisoformat(r["captured_at"]).astimezone(ZoneInfo("Europe/Lisbon")).strftime("%d %b %H:%M"), r["price"])
                         for r in reversed(trend)]
         run_id = os.getenv("GITHUB_RUN_ID") or secrets.token_hex(3)
         stamp = f"{now.strftime('%Y%m%d-%H%M')}-{run_id}"
@@ -51,12 +52,21 @@ def run() -> Path:
         metadata = {"captured_at": captured_at, "topic": topic, "title": copy.title,
                     "duration_seconds": round(duration, 2), "currency": cfg.currency,
                     "market_source": "Skinport public REST API", "featured_item": featured_name,
+                    "hook_variant": copy.hook_variant,
+                    "current_lowest_listing": copy.featured.get("price"),
+                    "reported_average_sale_24h": copy.featured.get("avg_sale_24h"),
+                    "change_24h_pct": copy.featured.get("change_24h_pct"),
+                    "change_7d_pct": copy.featured.get("change_7d_pct"),
                     "video_file": str(video_path), "upload_enabled": cfg.upload_enabled}
-        (cfg.output_dir / f"{stamp}-{topic}.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+        metadata_path = cfg.output_dir / f"{stamp}-{topic}.json"
+        metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
         log.info("Rendered %s (%s seconds): %s", video_path, round(duration, 1), copy.title)
         if cfg.upload_enabled:
             video_id = upload_video(video_path, copy, cfg)
-            store.record_published(topic, video_id, copy.title, featured_name)
+            metadata["youtube_video_id"] = video_id
+            metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+            store.record_published(topic, video_id, copy.title, featured_name,
+                                   copy.hook_variant, duration)
             log.info("Publish URL: https://youtube.com/shorts/%s", video_id)
         return video_path
     finally:

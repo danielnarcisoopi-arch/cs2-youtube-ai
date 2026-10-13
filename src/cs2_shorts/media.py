@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import html
 import logging
 import re
 import shutil
@@ -12,7 +11,7 @@ from urllib.parse import urlparse
 
 import edge_tts
 import requests
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 from .scripts import VideoCopy
 
@@ -46,8 +45,15 @@ def _font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
     return ImageFont.load_default()
 
 
-def _skin_image(name: str, url: str | None, target: Path, timeout: int) -> bool:
-    """Find the exact market-name image; fall back to the item's public OG image."""
+def _skin_image(name: str, target: Path, timeout: int) -> bool:
+    """Load only the exact catalog artwork; page-preview images can contain unwanted UI/text."""
+    if target.exists():
+        try:
+            with Image.open(target) as image:
+                image.verify()
+            return True
+        except Exception:
+            target.unlink(missing_ok=True)
     try:
         catalog_url = "https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/skins_not_grouped.json"
         response = requests.get(catalog_url, headers={"User-Agent": "CS2-Market-Shorts/2.0"}, timeout=(8, 45))
@@ -59,24 +65,8 @@ def _skin_image(name: str, url: str | None, target: Path, timeout: int) -> bool:
             if image_url and _download_image(image_url, target, timeout):
                 return True
     except Exception as exc:
-        log.info("Public skin catalog unavailable; trying marketplace art: %s", exc)
-
-    if not url or urlparse(url).hostname not in {"skinport.com", "www.skinport.com"}:
-        return False
-    try:
-        response = requests.get(url, headers={"User-Agent": "CS2-Market-Shorts/2.0", "Accept": "text/html"}, timeout=timeout)
-        if response.status_code in (403, 429):
-            log.info("Skinport item page declined image retrieval (HTTP %s)", response.status_code)
-            return False
-        response.raise_for_status()
-        match = re.search(r'<meta[^>]+(?:property|name)=["\']og:image["\'][^>]+content=["\']([^"\']+)', response.text, re.I)
-        if not match:
-            match = re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+(?:property|name)=["\']og:image', response.text, re.I)
-        return bool(match and _download_image(html.unescape(match.group(1)), target, timeout))
-    except Exception as exc:
-        log.warning("Could not retrieve item art; using designed fallback: %s", exc)
-        target.unlink(missing_ok=True)
-        return False
+        log.info("Exact catalog artwork unavailable; rendering a clean text-led hero: %s", exc)
+    return False
 
 
 def _download_image(image_url: str, target: Path, timeout: int) -> bool:
@@ -96,7 +86,7 @@ def _download_image(image_url: str, target: Path, timeout: int) -> bool:
         return False
 
 
-def _background(beat: int) -> Image.Image:
+def _background(beat: int, minimal: bool = False) -> Image.Image:
     """Fast full-bleed vertical gradient and market-grid texture."""
     top = (8 + (beat % 3), 17, 29)
     bottom = (3, 9, 17)
@@ -107,11 +97,12 @@ def _background(beat: int) -> Image.Image:
         t = y / max(1, H - 1)
         color = tuple(round(top[i] * (1 - t) + bottom[i] * t) for i in range(3))
         draw.line((0, y, W, y), fill=color)
-    for x in range(36, W, 84):
-        draw.line((x, 0, x, H), fill=GRID, width=1)
-    for y in range(110, H, 84):
-        draw.line((0, y, W, y), fill=GRID, width=1)
-    draw.rectangle((0, 0, 15, H), fill=MINT)
+    if not minimal:
+        for x in range(36, W, 84):
+            draw.line((x, 0, x, H), fill=GRID, width=1)
+        for y in range(110, H, 84):
+            draw.line((0, y, W, y), fill=GRID, width=1)
+    draw.rectangle((0, 0, 8 if minimal else 15, H), fill=MINT)
     return image
 
 
@@ -175,8 +166,13 @@ def _chart(draw: ImageDraw.ImageDraw, points: list[tuple[str, float]], box: tupl
         x0, y0 = coords[0]
         draw.line((x0, y0, coords[-1][0], y2 - 40), fill=(20, 90, 75), width=1)
         draw.ellipse((coords[-1][0] - 10, coords[-1][1] - 10, coords[-1][0] + 10, coords[-1][1] + 10), fill=WHITE)
-    _text(draw, f"{_money(low, currency)} LOW", (x1 + 28, y2 - 34), 18, MUTED, True, max_width=320)
-    _text(draw, "RECENT SNAPSHOTS", (x1 + 28, y1 + 24), 18, MUTED, True)
+    _text(draw, f"RANGE  {_money(low, currency)} – {_money(high, currency)}", (x1 + 28, y1 + 24), 17, MUTED, True, max_width=560)
+    left = usable[0][0]
+    right = usable[-1][0]
+    draw.text((x1 + 28, y2 - 34), left, font=_font(16, True), fill=MUTED)
+    right_font = _font(16, True)
+    right_width = draw.textbbox((0, 0), right, font=right_font)[2]
+    draw.text((x2 - right_width - 28, y2 - 34), right, font=right_font, fill=MUTED)
 
 
 def make_scenes(copy: VideoCopy, currency: str, data_dir: Path,
@@ -186,8 +182,9 @@ def make_scenes(copy: VideoCopy, currency: str, data_dir: Path,
     data_dir.mkdir(parents=True, exist_ok=True)
     item = copy.featured
     name = item["name"]
-    artwork = data_dir / "item-image.jpg"
-    got_image = image_fetch and _skin_image(name, item.get("item_page"), artwork, image_timeout)
+    safe_name = re.sub(r"[^a-zA-Z0-9_-]+", "-", name).strip("-")[:70] or "skin"
+    artwork = data_dir / f"item-{safe_name}.img"
+    got_image = image_fetch and _skin_image(name, artwork, image_timeout)
     change = _change(item)
     polarity = MINT if change is None or change >= 0 else RED
     chart = list(chart_points)
@@ -197,19 +194,26 @@ def make_scenes(copy: VideoCopy, currency: str, data_dir: Path,
     def item_art(image: Image.Image, box: tuple[int, int, int, int]) -> None:
         x1, y1, x2, y2 = box
         draw = ImageDraw.Draw(image)
-        draw.rounded_rectangle(box, radius=32, fill=PANEL, outline=(43, 64, 83), width=2)
         if got_image:
             try:
                 with Image.open(artwork) as source:
-                    art = ImageOps.contain(source.convert("RGBA"), (x2 - x1 - 50, y2 - y1 - 50))
-                image.paste(art, (x1 + (x2 - x1 - art.width) // 2, y1 + (y2 - y1 - art.height) // 2), art)
+                    art = source.convert("RGBA")
+                    alpha = art.getchannel("A")
+                    if alpha.getextrema() != (255, 255):
+                        bounds = alpha.getbbox()
+                        if bounds:
+                            art = art.crop(bounds)
+                    art = ImageOps.contain(art, (x2 - x1, y2 - y1), method=Image.Resampling.LANCZOS)
+                px = x1 + (x2 - x1 - art.width) // 2
+                py = y1 + (y2 - y1 - art.height) // 2
+                shadow = Image.new("RGBA", art.size, (0, 0, 0, 0))
+                shadow.putalpha(art.getchannel("A").filter(ImageFilter.GaussianBlur(22)).point(lambda value: value // 3))
+                image.paste(shadow, (px + 9, py + 18), shadow)
+                image.paste(art, (px, py), art)
                 return
             except Exception as exc:
                 log.info("Could not place skin artwork: %s", exc)
-        # A deliberate geometric fallback keeps the scene composed when art is missing.
-        draw.ellipse((x1 + 140, y1 + 70, x2 - 140, y2 - 70), outline=(46, 90, 91), width=5)
-        draw.line((x1 + 115, y2 - 100, x2 - 115, y1 + 100), fill=(46, 90, 91), width=3)
-        _text(draw, "CS2 MARKET", (x1 + 58, (y1 + y2) // 2 - 20), 26, MINT, True)
+        _text(draw, "CLEAN ITEM ART UNAVAILABLE", (x1 + 60, (y1 + y2) // 2 - 20), 25, MUTED, True)
 
     total = max(1, beat_count)
     for index in range(total):
@@ -223,7 +227,12 @@ def make_scenes(copy: VideoCopy, currency: str, data_dir: Path,
             phase = "decision"
         else:
             phase = evidence_phases[(index - 3) % len(evidence_phases)]
-        frame = _background(index)
+        frame = _background(index, minimal=phase in {"reveal", "decision"})
+        if phase == "reveal" and got_image:
+            glow = Image.new("RGBA", frame.size, (0, 0, 0, 0))
+            ImageDraw.Draw(glow).ellipse((200, 290, 900, 1020), fill=(38, 155, 129, 46))
+            glow = glow.filter(ImageFilter.GaussianBlur(115))
+            frame = Image.alpha_composite(frame.convert("RGBA"), glow).convert("RGB")
         draw = ImageDraw.Draw(frame)
         draw.rectangle((0, 0, W, 118), fill=(5, 13, 23))
         draw.text((48, 39), "CS2  /  MARKET SIGNAL", font=_font(25, True), fill=MINT)
@@ -231,7 +240,7 @@ def make_scenes(copy: VideoCopy, currency: str, data_dir: Path,
         draw.line((46, 120, 1030, 120), fill=(43, 64, 83), width=2)
         draw.rectangle((46, 1810, 1030, 1815), fill=(34, 53, 70))
         draw.rectangle((46, 1810, 46 + round(984 * (index + 1) / total), 1815), fill=MINT)
-        draw.text((50, 1840), f"{copy.topic.replace('_', ' ').upper()}  •  MARKET DATA, NOT A FORECAST",
+        draw.text((50, 1760), "SKINPORT DATA  •  MARKET INFORMATION, NOT A FORECAST",
                   font=_font(17, True), fill=MUTED)
 
         if phase == "alert":
@@ -252,10 +261,18 @@ def make_scenes(copy: VideoCopy, currency: str, data_dir: Path,
             _chart(draw, chart, (48, 1030, 1028, 1575), progress=.42, currency=currency)
         elif phase == "reveal":
             draw.text((62, 205), "THE ITEM", font=_font(25, True), fill=AMBER)
-            item_art(frame, (48, 290, 1030, 1030))
-            _text(draw, name, (62, 1080), 46, WHITE, True, max_width=940, max_lines=3)
-            _text(draw, f"LOWEST LISTING  {_money(item.get('price'), currency)}", (62, 1280), 29, MINT, True)
-            _text(draw, "Exact item match from the public CS2 catalog.", (62, 1360), 23, MUTED)
+            if got_image:
+                item_art(frame, (48, 270, 1030, 1010))
+                _text(draw, name, (62, 1060), 46, WHITE, True, max_width=940, max_lines=3)
+                _text(draw, f"LOWEST LISTING  {_money(item.get('price'), currency)}", (62, 1260), 29, MINT, True)
+                _text(draw, "MARKET ITEM · EXACT NAME MATCH", (62, 1340), 23, MUTED, True)
+            else:
+                _text(draw, name, (62, 430), 54, WHITE, True, max_width=940, max_lines=3)
+                if change is not None:
+                    _text(draw, f"{change:+.2f}%", (62, 680), 112, polarity, True)
+                    _text(draw, "TRACKED PRICE CHANGE", (66, 810), 23, MUTED, True)
+                _text(draw, f"LOWEST LISTING  {_money(item.get('price'), currency)}", (62, 1030), 34, MINT, True)
+                _text(draw, "Exact catalog weapon artwork unavailable for this run.", (62, 1110), 25, MUTED)
         elif phase == "tape":
             draw.text((62, 205), "PRICE CHECK", font=_font(25, True), fill=AMBER)
             _text(draw, "LISTING PRICE", (62, 360), 25, MUTED, True)
@@ -317,12 +334,17 @@ def _stamp(seconds: float) -> str:
 
 
 def _srt_text(narration: str, duration: float) -> str:
-    """Create short, mobile-readable caption beats distributed by spoken word count."""
-    words = narration.split()
-    chunks = [" ".join(words[start:start + 6]) for start in range(0, len(words), 6)]
+    """Keep caption beats short and aligned to sentence boundaries where possible."""
+    phrases = re.split(r"(?<!\d)(?<=[.!?])\s+", narration.strip())
+    chunks: list[str] = []
+    for phrase in phrases:
+        words = phrase.split()
+        while words:
+            chunks.append(" ".join(words[:6]))
+            words = words[6:]
     if not chunks:
         return ""
-    weights = [max(1, len(chunk.split())) for chunk in chunks]
+    weights = [max(1, len(chunk.split())) + (0.35 if chunk.endswith((".", "!", "?")) else 0) for chunk in chunks]
     total = sum(weights)
     cursor = 0.0
     blocks = []
@@ -396,8 +418,20 @@ def render_video(copy: VideoCopy, currency: str, market_page: str | None, chart_
     concat_inputs = "".join(f"[v{i}]" for i in range(len(scenes)))
     subtitle_style = ("FontName=DejaVu Sans,FontSize=19,PrimaryColour=&H00FFFFFF,"
                       "OutlineColour=&HCC07111D,BorderStyle=1,Outline=3,Shadow=0,"
-                      "Alignment=2,MarginL=90,MarginR=90,MarginV=310")
-    filters.append(f"{concat_inputs}concat=n={len(scenes)}:v=1:a=0,subtitles='{srt_arg}':force_style='{subtitle_style}'[vfinal]")
+                      "Alignment=2,MarginL=90,MarginR=90,MarginV=200")
+    item = copy.featured
+    ticker_text = (f"LOWEST ASK {_money(item.get('price'), currency)}  /  "
+                   f"SOLD AVG {_money(item.get('avg_sale_24h'), currency)}  /  "
+                   f"24H SALES {item.get('volume_24h', 0):,}  /  "
+                   f"LISTED {item.get('quantity', 0):,}   ")
+    ticker_text = (ticker_text.replace("\\", "\\\\").replace(":", "\\:")
+                   .replace("'", "\\'").replace(",", "\\,").replace("%", "\\%"))
+    fontfile = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    ticker = (f"drawtext=fontfile='{fontfile}':text='{ticker_text}':"
+              "x='w-mod(t*150\\,w+text_w)':y=139:fontsize=20:fontcolor=0x53E8B3:"
+              "box=1:boxcolor=0x050D17@0.94:boxborderw=10")
+    filters.append(f"{concat_inputs}concat=n={len(scenes)}:v=1:a=0,"
+                   f"subtitles='{srt_arg}':force_style='{subtitle_style}',{ticker}[vfinal]")
     audio_filter = f"atempo={speed:.5f},apad=pad_dur=0.15"
     command.extend(["-filter_complex", ";".join(filters), "-map", "[vfinal]", "-map", f"{audio_input}:a:0",
                     "-af", audio_filter, "-t", f"{target:.3f}", "-r", "30", "-c:v", "libx264",

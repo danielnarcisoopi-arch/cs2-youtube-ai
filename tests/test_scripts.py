@@ -22,7 +22,7 @@ def test_opening_hook_creates_a_question_before_naming_the_item():
     video = build_copy("gainers", [sample()], "EUR", spotlight=True)
     hook, reveal = video.narration.split("The item is ", 1)
     assert "AK-47" not in hook
-    assert hook.startswith("A CS2 skin is up")
+    assert hook.startswith("A tracked CS2 skin is up")
     assert reveal.startswith("AK-47")
     assert "The item is AK-47" in video.narration
 
@@ -46,3 +46,21 @@ def test_spotlight_voiceover_stays_short_and_ends_with_a_specific_prompt():
     video = build_copy("budget", [sample()], "EUR", spotlight=True)
     assert len(video.narration.split()) <= 70
     assert video.narration.endswith("Comment with your call—and why.")
+
+
+def test_price_gap_variant_uses_only_the_computed_listing_and_sale_average():
+    video = build_copy("gainers", [sample()], "EUR", hook_variant="price_gap")
+    hook, reveal = video.narration.split("The item is ", 1)
+    assert "3.6 percent above the reported 24-hour sale average" in hook
+    assert "AK-47" not in hook
+    assert reveal.startswith("AK-47")
+    assert video.hook_variant == "price_gap"
+
+
+def test_unsupported_hook_variant_fails_clearly():
+    try:
+        build_copy("gainers", [sample()], "EUR", hook_variant="invented")
+    except ValueError as exc:
+        assert "Unsupported hook variant" in str(exc)
+    else:
+        raise AssertionError("An unsupported hook variant was accepted")

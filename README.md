@@ -10,7 +10,8 @@ A Python + FFmpeg pipeline that reads CS2 skin-market data, turns one verified m
 - Stored point-in-time snapshots. Exact 24-hour and 7-day comparison prices are only reported after enough history has been collected. A nearest sample within eight hours of the target is used to tolerate scheduled-run delays.
 - One Short per run: 1080x1920 MP4, natural-length narration (normally about 18–30 seconds), readable captions, and a new full-screen market-news beat about every two seconds.
 - Story arc: open with a market question or signal, show the evidence, reveal the skin after the hook, compare listings with completed-sale statistics, then ask viewers for a specific buy/sell/wait call.
-- Full-bleed financial-news graphics with a consistent market identity, source labels, a progressive price chart, positive/negative signal colors, number-led hierarchy, and a composed fallback when item artwork is unavailable.
+- Two data-bound opening variants (market move and ask-versus-sale gap) are randomly assigned and recorded in the run JSON and SQLite publish history for later comparison.
+- Full-bleed financial-news graphics with a consistent market identity, moving data ticker, progressive price chart with timestamp endpoints, positive/negative signal colors, and a clean item-art hero.
 - Automated title, description and tags; upload through YouTube Data API OAuth refresh tokens.
 - SQLite market history persisted in the Git repository by the workflow; snapshots older than the retention setting are removed.
 - Retry handling, HTTP timeouts, 429/5xx retries, error logs, upload switch and rendering checks.
@@ -27,7 +28,7 @@ The current price is the lowest Skinport listing (`min_price`; suggested price i
 
 Steam Community Market does not provide a documented, stable public API for this complete feed. CSFloat's documented API uses API-key authentication and does not replace Skinport's free full-catalog price-history feed. The provider interface is isolated so additional authorized APIs can be added without changing the renderer or ranking calculations. No private endpoints or bot/CAPTCHA bypass are used.
 
-The featured item's picture is matched by exact market name against the public ByMykel/CSGO-API item catalog. If that catalog or the image is unavailable, the renderer tries the public Skinport item's OpenGraph metadata and then uses a branded fallback. This is best-effort; check current image and game-asset terms before commercial use. Set `MARKET_IMAGE_FETCH=false` to turn image retrieval off.
+The featured item's picture is matched by exact market name against the public ByMykel/CSGO-API item catalog. Marketplace page previews are not used because they can include extra text and UI. If exact catalog art is unavailable, the renderer uses a restrained text-led hero instead of displaying a cluttered page image. This is best-effort; check current image and game-asset terms before commercial use. Set `MARKET_IMAGE_FETCH=false` to turn image retrieval off.
 
 Narration tries Edge-TTS first. If Microsoft's endpoint rejects the request (for example, HTTP 403), the workflow uses a downloaded Piper neural voice instead of the very robotic eSpeak fallback. The fallback model is `en_US-libritts_r-medium`; its model card identifies the LibriTTS-R dataset under CC BY 4.0, and the generated YouTube description credits it. The initial workflow setup downloads the model into `data/voices`.
 
@@ -100,10 +101,10 @@ The history database is kept in Git to avoid relying on expiring Actions caches.
 
 ## Test and operational checks
 
-`pytest -q` tests ranking behavior and the script's opening-hook/data wording. The renderer probes the final MP4 to enforce portrait dimensions and a 12–45 second duration. A production smoke test still requires the omitted repository modules, authorized live API access, Edge-TTS or Piper, FFmpeg, and a real YouTube OAuth token; tests do not upload or contact the marketplace.
+`pytest -q` tests ranking behavior, hook variants, listing/sale wording, and SQLite history migration. The renderer probes the final MP4 to enforce portrait dimensions and a 12–45 second duration. A production smoke test still requires the omitted repository modules, authorized live API access, Edge-TTS or Piper, FFmpeg, and a real YouTube OAuth token; tests do not upload or contact the marketplace.
 
 ## Retention measurement
 
-The redesign is a creative hypothesis, not a measured retention result. Compare it with the previous format using YouTube Analytics: viewed-vs-swiped, average view duration, average percentage viewed, completion, comments per view, and shares per view. Review results by topic and hook style after enough impressions; do not infer a lift from one upload. Keep the current scheduled publishing workflow while collecting the baseline and follow-up metrics.
+The redesign is a creative hypothesis, not a measured retention result. Each upload records its hook variant, topic, item, and duration so the video can be joined to YouTube Analytics. Compare viewed-vs-swiped, average view duration, average percentage viewed, completion, comments per view, and shares per view by hook and topic after enough impressions; do not infer a lift from one upload. Keep the current scheduled publishing workflow while collecting the baseline and follow-up metrics.
 
 Monitor Actions failures, Skinport's API docs and rate limits, YouTube quota, and the OAuth consent-screen state. If a source is empty, malformed, throttled, or unavailable, the run fails rather than publishing made-up or stale prices. Edge-TTS is a free online service without an uptime guarantee; it is not an offline TTS engine.

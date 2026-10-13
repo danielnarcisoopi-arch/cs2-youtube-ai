@@ -58,3 +58,13 @@ This archive is not a complete runnable repository. `pipeline.py` imports `confi
 ## Scope and confidence
 
 Findings about code in this ZIP are direct. Findings about omitted provider, configuration, entry point, OAuth uploader, and the deployed production environment are unknown. The requested goal of doubling average retention is a target, not something source edits alone can guarantee. It requires a baseline and YouTube Analytics measurement, followed by controlled iteration.
+
+## Follow-up improvements applied
+
+1. **Stronger opening tests:** added a second hook format that compares the lowest current ask with the reported 24-hour sale average. Both variants are data-bound and keep the skin name out of the hook.
+2. **Cleaner skin artwork:** removed marketplace-page OpenGraph images, which may include page text and controls. The renderer now uses exact-name catalog artwork only; if unavailable, it uses a simple text-led hero. Catalog images are cached per item.
+3. **More motion:** added a continuously moving market ticker over the video, kept roughly two-second scene changes, and made the CTA the final beat at every supported duration.
+4. **Chart context:** chart graphics now label the observed price range and timestamp endpoints. Pipeline labels include date and time rather than date only.
+5. **Experiment records:** every run records its hook variant and the visible market facts in JSON. SQLite publish history stores hook variant and duration and migrates existing databases safely.
+6. **Story quality sampling:** the spotlight selector samples only the top five entries per ranking and weights the highest ranks more heavily, while keeping the 48-hour freshness preference.
+7. **Verification:** added a migration test and hook-variant tests. The local environment still lacks pytest, Edge TTS, and requests; rendering and production upload need verification in the complete repository with its installed dependencies and real data.
