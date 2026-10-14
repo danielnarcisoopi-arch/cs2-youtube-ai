@@ -24,6 +24,9 @@ class Settings:
     history_days: int = int(os.getenv("HISTORY_DAYS", "35"))
     image_fetch: bool = _bool("MARKET_IMAGE_FETCH", True)
     image_timeout: int = int(os.getenv("IMAGE_TIMEOUT_SECONDS", "8"))
+    skinshotter_enabled: bool = _bool("SKINSHOTTER_ENABLED", False)
+    skinshotter_clip_seconds: float = float(os.getenv("SKINSHOTTER_CLIP_SECONDS", "5"))
+    skinshotter_fallback_to_static: bool = _bool("SKINSHOTTER_FALLBACK_TO_STATIC", False)
     voice: str = os.getenv("EDGE_TTS_VOICE", "en-US-GuyNeural")
     upload_enabled: bool = _bool("UPLOAD_ENABLED", False)
     yt_token_json: str = os.getenv("YOUTUBE_TOKEN_JSON", "")
@@ -42,5 +45,7 @@ def validate_settings(s: Settings = settings) -> None:
         raise ValueError(f"Unsupported Skinport currency: {s.currency}")
     if s.history_days < 8:
         raise ValueError("HISTORY_DAYS must be at least 8 to retain a 7-day comparison baseline")
+    if not 3 <= s.skinshotter_clip_seconds <= 12:
+        raise ValueError("SKINSHOTTER_CLIP_SECONDS must be between 3 and 12")
     if s.yt_privacy not in {"public", "unlisted", "private"}:
         raise ValueError("YOUTUBE_PRIVACY_STATUS must be public, unlisted, or private")
