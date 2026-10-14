@@ -122,11 +122,16 @@ def _skin_catalog(data_dir: Path, timeout: int) -> list[dict]:
 
 def filter_rankings_to_weapon_skins(ranked: dict[str, list[dict]], data_dir: Path,
                                     timeout: int = 8) -> dict[str, list[dict]]:
-    """Exclude Skinport collectibles without canonical weapon artwork before selection."""
+    """Keep only catalog rows that can be rendered as a weapon POV scene."""
     catalog = _skin_catalog(data_dir, timeout)
     if not catalog:
         raise RuntimeError("The CS2 weapon artwork catalog is unavailable; refusing to select items without verified weapon images")
-    valid_names = {entry.get("market_hash_name") for entry in catalog if entry.get("market_hash_name")}
+    from .skinshotter import supports_weapon_pov
+
+    valid_names = {
+        entry.get("market_hash_name") for entry in catalog
+        if entry.get("market_hash_name") and supports_weapon_pov(entry)
+    }
     filtered = {topic: [item for item in items if item.get("name") in valid_names]
                 for topic, items in ranked.items()}
     removed = sum(len(items) - len(filtered[topic]) for topic, items in ranked.items())

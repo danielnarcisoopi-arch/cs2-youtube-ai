@@ -8,7 +8,8 @@ def test_market_shortlist_excludes_items_without_weapon_catalog_art(monkeypatch,
     weapon = {"name": "AK-47 | Redline (Field-Tested)"}
     music_kit = {"name": "Music Kit | Ben Bromfield, Rabbit Hole"}
     monkeypatch.setattr(media, "_skin_catalog", lambda *_args: [
-        {"market_hash_name": weapon["name"]},
+        {"market_hash_name": weapon["name"], "weapon": {"name": "AK-47"},
+         "pattern": {"name": "Redline"}, "category": {"name": "Rifles"}},
     ])
 
     filtered = media.filter_rankings_to_weapon_skins(
@@ -17,6 +18,23 @@ def test_market_shortlist_excludes_items_without_weapon_catalog_art(monkeypatch,
 
     assert filtered["gainers"] == [weapon]
     assert filtered["losers"] == []
+
+
+def test_market_shortlist_excludes_gloves_from_weapon_pov(monkeypatch, tmp_path):
+    weapon = {"name": "AK-47 | Redline (Field-Tested)"}
+    gloves = {"name": "★ Sport Gloves | Pandora's Box (Field-Tested)"}
+    monkeypatch.setattr(media, "_skin_catalog", lambda *_args: [
+        {"market_hash_name": weapon["name"], "weapon": {"name": "AK-47"},
+         "pattern": {"name": "Redline"}, "category": {"name": "Rifles"}},
+        {"market_hash_name": gloves["name"], "weapon": {"name": "Sport Gloves"},
+         "pattern": {"name": "Pandora's Box"}, "category": {"name": "Gloves"}},
+    ])
+
+    filtered = media.filter_rankings_to_weapon_skins(
+        {"gainers": [gloves, weapon]}, tmp_path,
+    )
+
+    assert filtered["gainers"] == [weapon]
 
 
 def test_weapon_art_stays_inside_safe_box_even_when_scale_exceeds_one(tmp_path):
