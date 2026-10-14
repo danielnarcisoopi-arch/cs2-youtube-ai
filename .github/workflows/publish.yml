@@ -24,6 +24,8 @@ jobs:
       YOUTUBE_PRIVACY_STATUS: public
       YOUTUBE_NOTIFY_SUBSCRIBERS: 'false'
       EDGE_TTS_VOICE: en-US-AriaNeural
+      EDGE_TTS_RATE: '+0%'
+      EDGE_TTS_PITCH: '+0Hz'
       ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
       ELEVENLABS_VOICE_ID: ${{ vars.ELEVENLABS_VOICE_ID }}
       CS2_MUSIC_PATH: ${{ vars.CS2_MUSIC_PATH }}
