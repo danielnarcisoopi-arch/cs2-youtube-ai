@@ -55,3 +55,13 @@ The free TTS route remains synthetic, even with shorter dialogue. For the most n
 Python syntax compilation succeeds. The environment does not include `pytest`, `requests`, or `edge-tts`, and the archive omits required production modules, so a full MP4 render, live neural-voice audition, marketplace fetch, and YouTube upload could not be verified here. The configured paid voice route also requires the user's own provider credentials and voice selection.
 
 The screenshot supports the 3/10 score for the previous render. No claim of doubled retention is made. Check the next render visually and compare viewed-versus-swiped, average view duration, average percentage viewed, comments, and shares in YouTube Analytics after enough impressions.
+# POV renderer update — 14 October 2026
+
+The publishing pipeline now has an automated Skinshotter renderer that runs inside GitHub Actions. Skinport still supplies the market selection and price evidence. The existing CS2 catalog resolves each selected market item into a Skinshotter weapon/finish page; Playwright opens and records a first-person inspect take, checks WebGPU and the applied exterior float, and FFmpeg composes the takes with the existing narration, music, market overlays, and YouTube upload path.
+
+This removes the need for a private CS2 server, Steam client, local recording, or a manually pasted inspect URL. It does depend on public Skinshotter availability and on WebGPU working inside the GitHub runner. Standard `ubuntu-latest` uses Mesa software Vulkan; a GitHub-hosted GPU larger runner can be selected with the repository variable `SKINSHOTTER_RUNNER` when the organization plan provides one.
+
+The public Skinshotter project documents first-person draw, inspect, and fire animations. Reload and free walking are not documented, so the implementation records inspect-focused movement and does not claim those extra actions. The catalog feed gives market-hash names and wear class but not the exact listing float or pattern seed; the generated model uses a representative float for the exterior and the viewer's default pattern. The workflow records this limitation in the README and run metadata.
+
+Manual workflow runs default to no YouTube upload and fail clearly when POV capture cannot be produced. Scheduled runs temporarily fall back to the previous image renderer on capture failure to preserve the existing daily publishing schedule; `visual_renderer` and `visual_renderer_error` in the output JSON make any fallback visible. Remove that fallback only after GitHub Actions artifacts confirm that POV capture works reliably.
+

@@ -1,6 +1,7 @@
 from PIL import Image, ImageDraw
 
 from cs2_shorts import media
+from cs2_shorts.scripts import build_copy
 
 
 def test_market_shortlist_excludes_items_without_weapon_catalog_art(monkeypatch, tmp_path):
@@ -33,3 +34,28 @@ def test_weapon_art_stays_inside_safe_box_even_when_scale_exceeds_one(tmp_path):
     assert points
     assert min(x for x, _ in points) >= 20
     assert max(x for x, _ in points) < 180
+
+
+def test_cold_open_displays_the_featured_skin_market_hook_without_its_name():
+    item = {
+        "name": "AK-47 | Redline (Field-Tested)", "price": 21.50,
+        "avg_sale_24h": 20.75, "change_24h_pct": 12.4,
+        "change_7d_pct": -3.2, "volume_24h": 18, "volatility_pct": 21.7,
+    }
+    copy = build_copy("gainers", [item], "EUR", spotlight=True)
+    headline, detail = media._hook_overlay(copy, "EUR")
+    assert headline == "+12.4%"
+    assert detail == "IN 24 HOURS"
+    assert item["name"] not in f"{headline} {detail}"
+
+
+def test_cold_open_price_gap_matches_the_voiceover_metric():
+    item = {
+        "name": "AK-47 | Redline (Field-Tested)", "price": 21.50,
+        "avg_sale_24h": 20.75, "change_24h_pct": 12.4,
+        "volume_24h": 18,
+    }
+    copy = build_copy("gainers", [item], "EUR", spotlight=True, hook_variant="price_gap")
+    headline, detail = media._hook_overlay(copy, "EUR")
+    assert headline == "3.6%"
+    assert detail == "ASK ABOVE RECENT SALES"

@@ -52,9 +52,15 @@ def run() -> Path:
         stamp = f"{now.strftime('%Y%m%d-%H%M')}-{run_id}"
         video_path = cfg.output_dir / f"{stamp}-{topic}.mp4"
         duration = render_video(copy, cfg.currency, cfg.data_dir / "render", video_path,
-            cfg.voice, cfg.image_fetch, cfg.image_timeout)
+            cfg.voice, cfg.image_fetch, cfg.image_timeout,
+            cfg.skinshotter_enabled, cfg.skinshotter_clip_seconds,
+            cfg.skinshotter_fallback_to_static)
+        renderer_status_path = cfg.data_dir / "render" / "renderer-status.json"
+        renderer_status = json.loads(renderer_status_path.read_text(encoding="utf-8")) if renderer_status_path.exists() else {}
         metadata = {"captured_at": captured_at, "topic": topic, "title": copy.title,
                     "duration_seconds": round(duration, 2), "currency": cfg.currency,
+                    "visual_renderer": renderer_status.get("renderer", "static catalog art"),
+                    "visual_renderer_error": renderer_status.get("error"),
                     "market_source": "Skinport public REST API", "featured_item": featured_name,
                     "featured_items": [row["name"] for row in copy.items],
                     "hook_variant": copy.hook_variant,

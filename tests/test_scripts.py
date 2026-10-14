@@ -59,6 +59,25 @@ def test_five_skin_showcase_keeps_skin_names_out_of_the_voiceover():
     assert video.narration.endswith("Tell me below.")
 
 
+def test_production_spotlight_uses_market_hook_even_with_five_visual_items():
+    rows = [sample(name=f"AK-47 | Skin {number} (Field-Tested)", price=number + 1.0)
+            for number in range(5)]
+    video = build_copy("gainers", rows, "EUR", spotlight=True, hook_variant="market_move")
+    hook, reveal = video.narration.split("This is the ", 1)
+    assert "up twelve point four percent" in hook
+    assert "AK-47" not in hook
+    assert "AK forty-seven Skin 0" in reveal
+    assert "Five CS2 skins" not in video.narration
+
+
+def test_production_spotlight_honors_price_gap_variant():
+    rows = [sample(name=f"AK-47 | Skin {number} (Field-Tested)") for number in range(5)]
+    video = build_copy("gainers", rows, "EUR", spotlight=True, hook_variant="price_gap")
+    assert "The current ask is above recent sales" in video.narration
+    assert "three point six percent higher" in video.narration
+    assert video.hook_variant == "price_gap"
+
+
 def test_unsupported_hook_variant_fails_clearly():
     try:
         build_copy("gainers", [sample()], "EUR", hook_variant="invented")

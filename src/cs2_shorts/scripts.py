@@ -109,7 +109,15 @@ def build_copy(topic: str, rows: list[dict[str, Any]], currency: str, spotlight:
         raise ValueError(f"Unsupported hook variant: {hook_variant}")
     items = rows[:5]
     item = items[0]
-    if len(items) > 1:
+    if spotlight:
+        # The pipeline deliberately selects one evidence-backed spotlight and
+        # one hook variant. Keep the video a multi-skin showcase, but make the
+        # narration tell the featured skin's actual market story. Previously
+        # this branch was bypassed for lists, so every production video used
+        # the same generic “five skins” opening and ignored its hook variant.
+        hook, reveal, cta = _market_move(item, topic, hook_variant)
+        narration = " ".join((hook, reveal, cta))
+    elif len(items) > 1:
         count = _small_number(len(items))
         hooks = {
             "gainers": f"{count.capitalize()} CS2 skins are moving up today. I'll show the current ask for each one.",

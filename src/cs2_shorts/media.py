@@ -172,6 +172,34 @@ def _money(value: float | int | None, currency: str) -> str:
     return f"{symbol}{value:,.2f}"
 
 
+def _hook_overlay(copy: VideoCopy, currency: str) -> tuple[str, str]:
+    """Return one compact, evidence-backed headline for the cold open."""
+    item = copy.featured
+    if copy.hook_variant == "price_gap":
+        price, average = item.get("price"), item.get("avg_sale_24h")
+        if price is not None and average and average > 0:
+            gap = (price / average - 1) * 100
+            if gap >= 1:
+                return f"{gap:.1f}%", "ASK ABOVE RECENT SALES"
+            if gap <= -1:
+                return f"{abs(gap):.1f}%", "ASK BELOW RECENT SALES"
+            return "UNDER 1%", "ASK AND SALES ARE ALIGNED"
+    if copy.topic == "gainers" and item.get("change_24h_pct") is not None:
+        return f"+{item['change_24h_pct']:.1f}%", "IN 24 HOURS"
+    if copy.topic == "losers" and item.get("change_24h_pct") is not None:
+        return f"{item['change_24h_pct']:.1f}%", "IN 24 HOURS"
+    if copy.topic == "weekly" and item.get("change_7d_pct") is not None:
+        change = item["change_7d_pct"]
+        return f"{change:+.1f}%", "THIS WEEK"
+    if copy.topic == "budget":
+        return _money(item.get("price"), currency), f"LOWEST ASK · {item.get('volume_24h', 0)} SALES TODAY"
+    if copy.topic == "dollar_volume":
+        return f"{item.get('volume_24h', 0)} SALES", "REPORTED IN 24 HOURS"
+    if copy.topic == "volatility" and item.get("volatility_pct") is not None:
+        return f"{item['volatility_pct']:.1f}%", "REPORTED SALE PRICE RANGE"
+    return "MARKET WATCH", "A CS2 SKIN TO KEEP AN EYE ON"
+
+
 def _draw_weapon(frame: Image.Image, art_path: Path | None, box: tuple[int, int, int, int],
                  scale: float = 1.0) -> None:
     if art_path is None:
@@ -225,8 +253,9 @@ def make_scenes(copy: VideoCopy, currency: str, data_dir: Path,
 
         if phase == "intro":
             _draw_weapon(frame, art_path, (15, 300, 1065, 1250), .96)
-            _text(draw, "5 SKINS", (540, 1325), 75, WHITE, True, anchor="mm")
-            _text(draw, "TO WATCH TODAY", (540, 1420), 28, LIME, True, anchor="mm")
+            headline, subline = _hook_overlay(copy, currency)
+            _text(draw, headline, (540, 1325), 75, WHITE, True, anchor="mm")
+            _text(draw, subline, (540, 1420), 25, LIME, True, anchor="mm")
         elif phase.startswith("item-"):
             item = items[current_index]
             _draw_weapon(frame, art_path, (15, 260, 1065, 1270), 1.12)
@@ -257,8 +286,8 @@ async def _synthesize(text: str, voice: str, path: Path) -> Path:
                 f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format=mp3_44100_128",
                 headers={"xi-api-key": api_key, "Content-Type": "application/json"},
                 json={"text": text, "model_id": "eleven_multilingual_v2",
-                      "voice_settings": {"stability": 0.42, "similarity_boost": 0.76,
-                                         "style": 0.32, "use_speaker_boost": True}},
+                      "voice_settings": {"stability": 0.34, "similarity_boost": 0.76,
+                                         "style": 0.46, "use_speaker_boost": True}},
                 timeout=(10, 90),
             )
             response.raise_for_status()
@@ -269,9 +298,11 @@ async def _synthesize(text: str, voice: str, path: Path) -> Path:
             path.unlink(missing_ok=True)
             log.warning("Configured premium voice failed; using neural fallback: %s", exc)
     last_error: Exception | None = None
+    rate = os.getenv("EDGE_TTS_RATE", "+0%").strip()
+    pitch = os.getenv("EDGE_TTS_PITCH", "+0Hz").strip()
     for attempt in range(2):
         try:
-            await edge_tts.Communicate(text, voice, rate="-5%", pitch="+0Hz", volume="+0%").save(str(path))
+            await edge_tts.Communicate(text, voice, rate=rate, pitch=pitch, volume="+0%").save(str(path))
             return path
         except Exception as exc:
             last_error = exc
@@ -300,10 +331,15 @@ def _music_input(ffmpeg: str, duration: float, data_dir: Path) -> tuple[list[str
         return ["-stream_loop", "-1", "-i", supplied], music_filter
     path = data_dir / "ambient-market-bed.wav"
     # Original low-volume chord bed with a gentle pulse; no third-party music asset/license needed.
-    expression = ("0.05*sin(2*PI*55*t)*(0.7+0.3*cos(2*PI*1.5*t))+"
-                  "0.035*sin(2*PI*110*t)+0.024*sin(2*PI*146.83*t)+"
-                  "0.020*sin(2*PI*220*t)+0.012*sin(2*PI*293.66*t)+"
-                  "0.012*sin(2*PI*440*t)*exp(-mod(t,0.75)*5)")
+    # A restrained two-chord progression with a soft pulse. A supplied,
+    # licensed track takes precedence; this is the self-contained fallback.
+    root = "if(lt(mod(t,8),4),110,130.81)"
+    third = "if(lt(mod(t,8),4),164.81,196)"
+    fifth = "if(lt(mod(t,8),4),220,261.63)"
+    expression = ("0.045*sin(2*PI*55*t)*(0.76+0.24*cos(2*PI*0.5*t))+"
+                  f"0.019*sin(2*PI*{root}*t)+0.015*sin(2*PI*{third}*t)+"
+                  f"0.012*sin(2*PI*{fifth}*t)+"
+                  "0.010*sin(2*PI*440*t)*exp(-mod(t,0.8)*5)")
     expression = expression.replace(",", r"\,")
     source = f"aevalsrc=exprs={expression}:sample_rate=44100:duration={duration + 1:.3f}"
     fade_start = max(0, duration - .8)
@@ -313,11 +349,136 @@ def _music_input(ffmpeg: str, duration: float, data_dir: Path) -> tuple[list[str
     return ["-i", str(path)], "loudnorm=I=-26:TP=-2:LRA=7"
 
 
+def _pov_overlay(copy: VideoCopy, currency: str, phase: str, index: int,
+                 total: int, output: Path) -> Path:
+    """Create sparse, high-contrast labels over live POV footage."""
+    layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(layer)
+    # Keep all text in the upper-left map space, away from the lower-right gun viewmodel.
+    draw.rounded_rectangle((44, 54, 320, 108), radius=18, fill=(5, 9, 15, 190))
+    draw.ellipse((60, 73, 74, 87), fill=LIME)
+    _text(draw, "CS2  /  MARKET", (90, 81), 20, WHITE, True, anchor="lm")
+
+    if phase == "hook":
+        headline, subline = _hook_overlay(copy, currency)
+        draw.rounded_rectangle((44, 136, 880, 438), radius=28, fill=(4, 8, 13, 155))
+        _text(draw, headline, (76, 178), 84 if len(headline) < 12 else 68, LIME, True)
+        _text(draw, subline, (80, 282), 28, WHITE, True)
+        _text(draw, "HERE'S THE SKIN BEHIND THE MOVE", (80, 345), 22, MUTED, False)
+    elif phase == "item":
+        item = (copy.items or [copy.featured])[index]
+        draw.rounded_rectangle((44, 136, 850, 410), radius=28, fill=(4, 8, 13, 155))
+        _text(draw, f"{index + 1:02d}  /  {total:02d}", (80, 174), 23, LIME, True)
+        name_lines = _wrap_name(_base_skin_name(item["name"]), max_width=735, size=40)
+        for line_no, line in enumerate(name_lines):
+            _text(draw, line, (80, 220 + line_no * 50), 40, WHITE, True)
+        _text(draw, _money(item.get("price"), currency), (80, 337), 48, LIME, True)
+    else:
+        draw.rounded_rectangle((44, 136, 870, 340), radius=28, fill=(4, 8, 13, 155))
+        _text(draw, "BUY  OR  PASS?", (80, 184), 64, WHITE, True)
+        _text(draw, "WHICH SKIN WOULD YOU EQUIP?", (82, 276), 24, LIME, True)
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    layer.save(output)
+    return output
+
+
+def _base_skin_name(name: str) -> str:
+    value = re.sub(r"\s*\((?:Factory New|Minimal Wear|Field-Tested|Well-Worn|Battle-Scarred)\)$", "", name, flags=re.I)
+    return re.sub(r"^(?:StatTrak™?\s+|Souvenir\s+|★\s*)", "", value).strip()
+
+
+def _render_pov_video(ffmpeg: str, ffprobe: str, copy: VideoCopy, currency: str,
+                      data_dir: Path, output_path: Path, audio: Path, duration: float,
+                      clip_paths: list[Path]) -> float:
+    """Cut captured Skinshotter POV clips together with restrained overlays and audio."""
+    items = (copy.items or [copy.featured])[:5]
+    if len(clip_paths) != len(items) or not clip_paths:
+        raise RuntimeError("POV renderer did not return one clip for each selected skin")
+    segment_count = len(items) + 2
+    segment_duration = duration / segment_count
+    overlays: list[Path] = []
+    for scene_index in range(segment_count):
+        if scene_index == 0:
+            phase, item_index = "hook", 0
+            clip = clip_paths[0]
+        elif scene_index == segment_count - 1:
+            phase, item_index = "cta", len(items) - 1
+            clip = clip_paths[-1]
+        else:
+            phase, item_index = "item", scene_index - 1
+            clip = clip_paths[item_index]
+        overlay = _pov_overlay(copy, currency, phase, item_index, len(items),
+                               data_dir / f"pov-overlay-{scene_index + 1:02d}.png")
+        overlays.append(overlay)
+
+    command = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error"]
+    for scene_index in range(segment_count):
+        clip = clip_paths[0] if scene_index == 0 else clip_paths[-1] if scene_index == segment_count - 1 else clip_paths[scene_index - 1]
+        command.extend(["-stream_loop", "-1", "-i", str(clip)])
+    for overlay in overlays:
+        command.extend(["-loop", "1", "-framerate", "30", "-t", f"{segment_duration:.4f}", "-i", str(overlay)])
+    audio_input = segment_count * 2
+    command.extend(["-i", str(audio)])
+    music_args, music_filter = _music_input(ffmpeg, duration, data_dir)
+    music_input = audio_input + 1
+    command.extend(music_args)
+
+    filters: list[str] = []
+    for index in range(segment_count):
+        filters.append(
+            f"[{index}:v]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
+            f"fps=30,trim=duration={segment_duration:.4f},setpts=PTS-STARTPTS,setsar=1[base{index}]"
+        )
+        overlay_input = segment_count + index
+        filters.append(
+            f"[{overlay_input}:v]format=rgba,trim=duration={segment_duration:.4f},"
+            f"setpts=PTS-STARTPTS[overlay{index}]"
+        )
+        filters.append(f"[base{index}][overlay{index}]overlay=0:0:shortest=1[v{index}]")
+    concat_inputs = "".join(f"[v{i}]" for i in range(segment_count))
+    filters.append(f"{concat_inputs}concat=n={segment_count}:v=1:a=0[vfinal]")
+    filters.append(f"[{audio_input}:a]aresample=44100,apad=whole_dur={duration:.3f},loudnorm=I=-16:TP=-1.5:LRA=10[voice]")
+    filters.append(f"[{music_input}:a]{music_filter}[bed]")
+    filters.extend([
+        "[voice]asplit=2[voice_mix][voice_key]",
+        "[bed][voice_key]sidechaincompress=threshold=0.025:ratio=7:attack=12:release=280:makeup=1[ducked_bed]",
+        "[voice_mix][ducked_bed]amix=inputs=2:duration=first:weights='1 0.75':normalize=0,alimiter=limit=0.95[aout]",
+    ])
+    command.extend([
+        "-filter_complex", ";".join(filters), "-map", "[vfinal]", "-map", "[aout]",
+        "-t", f"{duration:.3f}", "-r", "30", "-c:v", "libx264", "-preset", "medium",
+        "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
+        "-movflags", "+faststart", str(output_path),
+    ])
+    try:
+        subprocess.run(command, check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as exc:
+        log.error("FFmpeg POV render failed: %s", exc.stderr[-4000:] if exc.stderr else exc)
+        raise
+    verify = subprocess.run(
+        [ffprobe, "-v", "error", "-show_entries", "format=duration:stream=width,height",
+         "-of", "default=noprint_wrappers=1", str(output_path)],
+        check=True, capture_output=True, text=True,
+    ).stdout
+    if "width=1080" not in verify or "height=1920" not in verify:
+        raise RuntimeError(f"POV render is not 1080x1920: {verify}")
+    match = re.search(r"duration=([\d.]+)", verify)
+    final_duration = float(match.group(1)) if match else 0
+    if final_duration < 12 or final_duration > 45:
+        raise RuntimeError(f"Rendered Short duration outside 12–45 seconds: {final_duration:.2f}")
+    return final_duration
+
+
 def render_video(copy: VideoCopy, currency: str, data_dir: Path, output_path: Path,
-                 voice: str, image_fetch: bool = True, image_timeout: int = 8) -> float:
+                 voice: str, image_fetch: bool = True, image_timeout: int = 8,
+                 skinshotter_enabled: bool = False, skinshotter_clip_seconds: float = 5.0,
+                 skinshotter_fallback_to_static: bool = False) -> float:
     ffmpeg, ffprobe = require_binary("ffmpeg"), require_binary("ffprobe")
     data_dir.mkdir(parents=True, exist_ok=True)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    status_path = data_dir / "renderer-status.json"
+    status_path.write_text(json.dumps({"renderer": "static catalog art"}, indent=2), encoding="utf-8")
     audio = asyncio.run(_synthesize(copy.narration, voice, data_dir / "voice.mp3"))
     probe = subprocess.run([ffprobe, "-v", "error", "-show_entries", "format=duration", "-of",
                             "default=noprint_wrappers=1:nokey=1", str(audio)],
@@ -327,6 +488,29 @@ def render_video(copy: VideoCopy, currency: str, data_dir: Path, output_path: Pa
         raise RuntimeError("Speech synthesis generated empty audio")
     item_count = len(copy.items or [copy.featured])
     duration = max(speech_duration, 12.0, 3.4 + item_count * 2.2)
+    if skinshotter_enabled:
+        # Keep capture inside the Actions job: no game server or manual recording.
+        # Import lazily so local static renders and test environments do not need Chromium.
+        from .skinshotter import capture_skin_clips
+
+        try:
+            catalog = _skin_catalog(data_dir, image_timeout)
+            clips = capture_skin_clips((copy.items or [copy.featured])[:5], catalog,
+                                       data_dir / "skinshotter", skinshotter_clip_seconds)
+            final_duration = _render_pov_video(ffmpeg, ffprobe, copy, currency, data_dir, output_path,
+                                               audio, duration, clips)
+            status_path.write_text(json.dumps({
+                "renderer": "Skinshotter POV", "clips": len(clips),
+            }, indent=2), encoding="utf-8")
+            return final_duration
+        except Exception as exc:
+            if not skinshotter_fallback_to_static:
+                raise
+            log.error("Skinshotter failed; using the existing static renderer to protect the scheduled upload: %s", exc)
+            status_path.write_text(json.dumps({
+                "renderer": "static catalog art (Skinshotter fallback)",
+                "error": f"{type(exc).__name__}: {exc}",
+            }, indent=2), encoding="utf-8")
     scenes = make_scenes(copy, currency, data_dir, image_fetch, image_timeout)
     scene_duration = duration / len(scenes)
     command = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error"]
@@ -351,7 +535,11 @@ def render_video(copy: VideoCopy, currency: str, data_dir: Path, output_path: Pa
     filters.append(f"[{audio_input}:a]aresample=44100,apad=whole_dur={duration:.3f},"
                    f"loudnorm=I=-16:TP=-1.5:LRA=10[voice]")
     filters.append(f"[{music_input}:a]{music_filter}[bed]")
-    filters.append("[voice][bed]amix=inputs=2:duration=first:weights='1 1':normalize=0,alimiter=limit=0.95[aout]")
+    # Split the narration: one copy is mixed at full level, the other gently
+    # ducks the music while speech is present so words stay clear on phones.
+    filters.append("[voice]asplit=2[voice_mix][voice_key]")
+    filters.append("[bed][voice_key]sidechaincompress=threshold=0.025:ratio=7:attack=12:release=280:makeup=1[ducked_bed]")
+    filters.append("[voice_mix][ducked_bed]amix=inputs=2:duration=first:weights='1 0.75':normalize=0,alimiter=limit=0.95[aout]")
     command.extend(["-filter_complex", ";".join(filters), "-map", "[vfinal]", "-map", "[aout]",
                     "-t", f"{duration:.3f}", "-r", "30", "-c:v", "libx264", "-preset", "medium",
                     "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
@@ -371,3 +559,5 @@ def render_video(copy: VideoCopy, currency: str, data_dir: Path, output_path: Pa
     if final_duration < 12 or final_duration > 45:
         raise RuntimeError(f"Rendered Short duration outside 12–45 seconds: {final_duration:.2f}")
     return final_duration
+
+
