@@ -1,0 +1,49 @@
+name: CS2SCREEN viewer capture proof of concept
+
+on:
+  workflow_dispatch:
+    inputs:
+      viewer_url:
+        description: Official CS2SCREEN viewer URL (leave the public demo URL for the first run)
+        required: true
+        default: https://3d.cs2screen.com/?inspectlink=steam%3A%2F%2Frun%2F730%2F%2F%2Bcsgo_econ_action_preview%25203A2AFDEC99B99B3B22B13E1AE23C123C0A390280F6B1D2397AEB3B723A6ABB3952244A32899C03EE&key=pk_4f1f44c6b7c67b7b699d9d39&embed=1
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install FFmpeg and Vulkan software renderer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libvulkan1 mesa-vulkan-drivers
+      - name: Install Playwright and Chromium
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'playwright>=1.59,<2'
+          python -m playwright install --with-deps chromium
+      - name: Capture official CS2SCREEN viewer
+        env:
+          VIEWER_URL: ${{ inputs.viewer_url }}
+        run: >-
+          python scripts/cs2screen_poc.py
+          --url "$VIEWER_URL"
+          --seconds 10
+          --output output/cs2screen-poc
+      - name: Upload video and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cs2screen-poc-${{ github.run_id }}
+          path: output/cs2screen-poc/
+          if-no-files-found: warn
+          retention-days: 14
