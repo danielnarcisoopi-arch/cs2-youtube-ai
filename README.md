@@ -18,7 +18,7 @@ A Python + FFmpeg pipeline that turns verified CS2 skin-market rankings into a c
 
 The script generator is deterministic and uses only fetched prices and calculated metrics. It does not call an LLM or invent catalysts, trader sentiment, or future returns. The voice gives a short introduction and CTA instead of reading five names and prices aloud. Skin names and prices appear on their own visual beats.
 
-See [ARCHITECTURE-REPORT.md](ARCHITECTURE-REPORT.md) for the pre-change review, bottlenecks, and scope limitations. The uploaded archive is a patch, not a complete standalone repository: it omits `config.py`, `providers/skinport.py`, `youtube.py`, the package entry point, and packaging/setup files referenced below. Overlay the updated files onto the existing production repository; an isolated build cannot be verified from this archive alone.
+See [ARCHITECTURE-REPORT.md](ARCHITECTURE-REPORT.md) for the pre-change review, bottlenecks, and scope limitations. This distribution includes the package entry point, project metadata, Skinport provider, configuration, and YouTube OAuth upload module required by the publishing workflow.
 
 ## Data source and metric limits
 
