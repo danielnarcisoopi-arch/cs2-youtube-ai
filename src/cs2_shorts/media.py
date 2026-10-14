@@ -172,6 +172,34 @@ def _money(value: float | int | None, currency: str) -> str:
     return f"{symbol}{value:,.2f}"
 
 
+def _hook_overlay(copy: VideoCopy, currency: str) -> tuple[str, str]:
+    """Return one compact, evidence-backed headline for the cold open."""
+    item = copy.featured
+    if copy.hook_variant == "price_gap":
+        price, average = item.get("price"), item.get("avg_sale_24h")
+        if price is not None and average and average > 0:
+            gap = (price / average - 1) * 100
+            if gap >= 1:
+                return f"{gap:.1f}%", "ASK ABOVE RECENT SALES"
+            if gap <= -1:
+                return f"{abs(gap):.1f}%", "ASK BELOW RECENT SALES"
+            return "UNDER 1%", "ASK AND SALES ARE ALIGNED"
+    if copy.topic == "gainers" and item.get("change_24h_pct") is not None:
+        return f"+{item['change_24h_pct']:.1f}%", "IN 24 HOURS"
+    if copy.topic == "losers" and item.get("change_24h_pct") is not None:
+        return f"{item['change_24h_pct']:.1f}%", "IN 24 HOURS"
+    if copy.topic == "weekly" and item.get("change_7d_pct") is not None:
+        change = item["change_7d_pct"]
+        return f"{change:+.1f}%", "THIS WEEK"
+    if copy.topic == "budget":
+        return _money(item.get("price"), currency), f"LOWEST ASK · {item.get('volume_24h', 0)} SALES TODAY"
+    if copy.topic == "dollar_volume":
+        return f"{item.get('volume_24h', 0)} SALES", "REPORTED IN 24 HOURS"
+    if copy.topic == "volatility" and item.get("volatility_pct") is not None:
+        return f"{item['volatility_pct']:.1f}%", "REPORTED SALE PRICE RANGE"
+    return "MARKET WATCH", "A CS2 SKIN TO KEEP AN EYE ON"
+
+
 def _draw_weapon(frame: Image.Image, art_path: Path | None, box: tuple[int, int, int, int],
                  scale: float = 1.0) -> None:
     if art_path is None:
@@ -225,8 +253,9 @@ def make_scenes(copy: VideoCopy, currency: str, data_dir: Path,
 
         if phase == "intro":
             _draw_weapon(frame, art_path, (15, 300, 1065, 1250), .96)
-            _text(draw, "5 SKINS", (540, 1325), 75, WHITE, True, anchor="mm")
-            _text(draw, "TO WATCH TODAY", (540, 1420), 28, LIME, True, anchor="mm")
+            headline, subline = _hook_overlay(copy, currency)
+            _text(draw, headline, (540, 1325), 75, WHITE, True, anchor="mm")
+            _text(draw, subline, (540, 1420), 25, LIME, True, anchor="mm")
         elif phase.startswith("item-"):
             item = items[current_index]
             _draw_weapon(frame, art_path, (15, 260, 1065, 1270), 1.12)
@@ -257,8 +286,8 @@ async def _synthesize(text: str, voice: str, path: Path) -> Path:
                 f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format=mp3_44100_128",
                 headers={"xi-api-key": api_key, "Content-Type": "application/json"},
                 json={"text": text, "model_id": "eleven_multilingual_v2",
-                      "voice_settings": {"stability": 0.42, "similarity_boost": 0.76,
-                                         "style": 0.32, "use_speaker_boost": True}},
+                      "voice_settings": {"stability": 0.34, "similarity_boost": 0.76,
+                                         "style": 0.46, "use_speaker_boost": True}},
                 timeout=(10, 90),
             )
             response.raise_for_status()
@@ -269,9 +298,11 @@ async def _synthesize(text: str, voice: str, path: Path) -> Path:
             path.unlink(missing_ok=True)
             log.warning("Configured premium voice failed; using neural fallback: %s", exc)
     last_error: Exception | None = None
+    rate = os.getenv("EDGE_TTS_RATE", "+0%").strip()
+    pitch = os.getenv("EDGE_TTS_PITCH", "+0Hz").strip()
     for attempt in range(2):
         try:
-            await edge_tts.Communicate(text, voice, rate="-5%", pitch="+0Hz", volume="+0%").save(str(path))
+            await edge_tts.Communicate(text, voice, rate=rate, pitch=pitch, volume="+0%").save(str(path))
             return path
         except Exception as exc:
             last_error = exc
@@ -300,10 +331,15 @@ def _music_input(ffmpeg: str, duration: float, data_dir: Path) -> tuple[list[str
         return ["-stream_loop", "-1", "-i", supplied], music_filter
     path = data_dir / "ambient-market-bed.wav"
     # Original low-volume chord bed with a gentle pulse; no third-party music asset/license needed.
-    expression = ("0.05*sin(2*PI*55*t)*(0.7+0.3*cos(2*PI*1.5*t))+"
-                  "0.035*sin(2*PI*110*t)+0.024*sin(2*PI*146.83*t)+"
-                  "0.020*sin(2*PI*220*t)+0.012*sin(2*PI*293.66*t)+"
-                  "0.012*sin(2*PI*440*t)*exp(-mod(t,0.75)*5)")
+    # A restrained two-chord progression with a soft pulse. A supplied,
+    # licensed track takes precedence; this is the self-contained fallback.
+    root = "if(lt(mod(t,8),4),110,130.81)"
+    third = "if(lt(mod(t,8),4),164.81,196)"
+    fifth = "if(lt(mod(t,8),4),220,261.63)"
+    expression = ("0.045*sin(2*PI*55*t)*(0.76+0.24*cos(2*PI*0.5*t))+"
+                  f"0.019*sin(2*PI*{root}*t)+0.015*sin(2*PI*{third}*t)+"
+                  f"0.012*sin(2*PI*{fifth}*t)+"
+                  "0.010*sin(2*PI*440*t)*exp(-mod(t,0.8)*5)")
     expression = expression.replace(",", r"\,")
     source = f"aevalsrc=exprs={expression}:sample_rate=44100:duration={duration + 1:.3f}"
     fade_start = max(0, duration - .8)
@@ -351,7 +387,11 @@ def render_video(copy: VideoCopy, currency: str, data_dir: Path, output_path: Pa
     filters.append(f"[{audio_input}:a]aresample=44100,apad=whole_dur={duration:.3f},"
                    f"loudnorm=I=-16:TP=-1.5:LRA=10[voice]")
     filters.append(f"[{music_input}:a]{music_filter}[bed]")
-    filters.append("[voice][bed]amix=inputs=2:duration=first:weights='1 1':normalize=0,alimiter=limit=0.95[aout]")
+    # Split the narration: one copy is mixed at full level, the other gently
+    # ducks the music while speech is present so words stay clear on phones.
+    filters.append("[voice]asplit=2[voice_mix][voice_key]")
+    filters.append("[bed][voice_key]sidechaincompress=threshold=0.025:ratio=7:attack=12:release=280:makeup=1[ducked_bed]")
+    filters.append("[voice_mix][ducked_bed]amix=inputs=2:duration=first:weights='1 0.75':normalize=0,alimiter=limit=0.95[aout]")
     command.extend(["-filter_complex", ";".join(filters), "-map", "[vfinal]", "-map", "[aout]",
                     "-t", f"{duration:.3f}", "-r", "30", "-c:v", "libx264", "-preset", "medium",
                     "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
