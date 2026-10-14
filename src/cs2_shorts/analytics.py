@@ -14,12 +14,14 @@ def rankings(rows: list[dict[str, Any]], min_volume: int = 1, min_listings: int 
         low, high = r.get("min_sale_24h"), r.get("max_sale_24h")
         r["volatility_pct"] = round((high - low) / avg * 100, 2) if avg and low is not None and high is not None else None
     return {
-        "gainers": sorted([r for r in with_day if r["change_24h_pct"] > 0], key=lambda x: x["change_24h_pct"], reverse=True)[:10],
-        "losers": sorted([r for r in with_day if r["change_24h_pct"] < 0], key=lambda x: x["change_24h_pct"])[:10],
-        "weekly": sorted([r for r in with_week if r["change_7d_pct"] is not None], key=lambda x: x["change_7d_pct"], reverse=True)[:10],
-        "budget": sorted(budget, key=lambda x: (x["volume_24h"], x["avg_sale_24h"] or 0), reverse=True)[:10],
-        "dollar_volume": sorted(liquid, key=lambda x: (x["avg_sale_24h"] or 0) * x["volume_24h"], reverse=True)[:10],
-        "volatility": sorted([r for r in liquid if r["volatility_pct"] is not None], key=lambda x: x["volatility_pct"], reverse=True)[:10],
+        # Keep a deeper candidate pool: downstream filters remove non-weapon
+        # Skinport products, then choose from the strongest eligible skins.
+        "gainers": sorted([r for r in with_day if r["change_24h_pct"] > 0], key=lambda x: x["change_24h_pct"], reverse=True)[:30],
+        "losers": sorted([r for r in with_day if r["change_24h_pct"] < 0], key=lambda x: x["change_24h_pct"])[:30],
+        "weekly": sorted([r for r in with_week if r["change_7d_pct"] is not None], key=lambda x: x["change_7d_pct"], reverse=True)[:30],
+        "budget": sorted(budget, key=lambda x: (x["volume_24h"], x["avg_sale_24h"] or 0), reverse=True)[:30],
+        "dollar_volume": sorted(liquid, key=lambda x: (x["avg_sale_24h"] or 0) * x["volume_24h"], reverse=True)[:30],
+        "volatility": sorted([r for r in liquid if r["volatility_pct"] is not None], key=lambda x: x["volatility_pct"], reverse=True)[:30],
     }
 
 

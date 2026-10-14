@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 from .analytics import choose_spotlight, rankings
 from .config import settings, validate_settings
-from .media import render_video
+from .media import filter_rankings_to_weapon_skins, render_video
 from .providers.skinport import SkinportProvider
 from .scripts import build_copy
 from .storage import MarketStore
@@ -31,6 +31,9 @@ def run() -> Path:
         store.prune(cfg.history_days)
         current = store.candidates(captured_at)
         rank = rankings(current, cfg.min_volume_24h, cfg.min_listings)
+        # Skinport also returns music kits and other collectibles. Select from
+        # weapon skins with verified catalog art so a non-weapon cannot break a run.
+        rank = filter_rankings_to_weapon_skins(rank, cfg.data_dir / "render", cfg.image_timeout)
         now = datetime.now(timezone.utc).astimezone(ZoneInfo("Europe/Lisbon"))
         try:
             recent_items = store.recently_published_items(within_hours=48)

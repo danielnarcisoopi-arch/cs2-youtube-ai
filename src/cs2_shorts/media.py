@@ -75,20 +75,7 @@ def _skin_image(name: str, target: Path, timeout: int) -> bool:
         except Exception:
             target.unlink(missing_ok=True)
     try:
-        cache = target.parent / "skins-catalog.json"
-        rows = None
-        if cache.exists() and time.time() - cache.stat().st_mtime < 7 * 24 * 60 * 60:
-            try:
-                rows = json.loads(cache.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                rows = None
-        if rows is None:
-            url = "https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/skins_not_grouped.json"
-            response = requests.get(url, headers={"User-Agent": "CS2-Market-Shorts/3.0"}, timeout=(8, 45))
-            response.raise_for_status()
-            rows = response.json()
-            if isinstance(rows, list):
-                cache.write_text(json.dumps(rows), encoding="utf-8")
+        rows = _skin_catalog(target.parent, timeout)
         row = next((entry for entry in rows if entry.get("market_hash_name") == name), None) if isinstance(rows, list) else None
         image_url = row.get("image") if row else None
         if image_url and urlparse(image_url).scheme == "https":
@@ -102,6 +89,52 @@ def _skin_image(name: str, target: Path, timeout: int) -> bool:
     except Exception as exc:
         log.info("Exact weapon art unavailable; using the clean typographic fallback: %s", exc)
     return False
+
+
+def _skin_catalog(data_dir: Path, timeout: int) -> list[dict]:
+    """Load the canonical weapon-skin catalog, using its cache during outages."""
+    data_dir.mkdir(parents=True, exist_ok=True)
+    cache = data_dir / "skins-catalog.json"
+    cached = None
+    if cache.exists():
+        try:
+            cached = json.loads(cache.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            cached = None
+    if isinstance(cached, list) and time.time() - cache.stat().st_mtime < 7 * 24 * 60 * 60:
+        return cached
+    try:
+        url = "https://raw.githubusercontent.com/ByMykel/CSGO-API/main/public/api/en/skins_not_grouped.json"
+        response = requests.get(url, headers={"User-Agent": "CS2-Market-Shorts/3.0"}, timeout=(8, max(8, timeout)))
+        response.raise_for_status()
+        rows = response.json()
+        if not isinstance(rows, list):
+            raise ValueError("Weapon catalog response is not a list")
+        cache.write_text(json.dumps(rows), encoding="utf-8")
+        return rows
+    except Exception as exc:
+        if isinstance(cached, list):
+            log.warning("Using the cached weapon catalog after a refresh failure: %s", exc)
+            return cached
+        log.error("Could not load the canonical weapon catalog: %s", exc)
+        return []
+
+
+def filter_rankings_to_weapon_skins(ranked: dict[str, list[dict]], data_dir: Path,
+                                    timeout: int = 8) -> dict[str, list[dict]]:
+    """Exclude Skinport collectibles without canonical weapon artwork before selection."""
+    catalog = _skin_catalog(data_dir, timeout)
+    if not catalog:
+        raise RuntimeError("The CS2 weapon artwork catalog is unavailable; refusing to select items without verified weapon images")
+    valid_names = {entry.get("market_hash_name") for entry in catalog if entry.get("market_hash_name")}
+    filtered = {topic: [item for item in items if item.get("name") in valid_names]
+                for topic, items in ranked.items()}
+    removed = sum(len(items) - len(filtered[topic]) for topic, items in ranked.items())
+    if removed:
+        log.info("Skipped %d non-weapon or unsupported market items without canonical weapon artwork", removed)
+    if not any(filtered.values()):
+        raise RuntimeError("No ranked Skinport items matched the canonical weapon-skin catalog")
+    return filtered
 
 
 def _background(beat: int, accent: tuple[int, int, int] = LIME,
@@ -152,7 +185,9 @@ def _draw_weapon(frame: Image.Image, art_path: Path | None, box: tuple[int, int,
             if bounds:
                 art = art.crop(bounds)
         x1, y1, x2, y2 = box
-        size = (int((x2 - x1) * scale), int((y2 - y1) * scale))
+        # Scale never exceeds the safe box: a weapon must not be cropped by the canvas edge.
+        safe_scale = min(max(scale, 0.1), 0.90)
+        size = (int((x2 - x1) * safe_scale), int((y2 - y1) * safe_scale))
         art = ImageOps.contain(art, size, method=Image.Resampling.LANCZOS)
         px = (x1 + x2 - art.width) // 2
         py = (y1 + y2 - art.height) // 2
