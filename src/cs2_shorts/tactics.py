@@ -6,12 +6,13 @@ import logging
 import math
 import os
 import subprocess
+import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 log = logging.getLogger(__name__)
 W, H = 1080, 1920
@@ -58,8 +59,8 @@ class Tactic:
         return " ".join((self.hook, self.setup, self.action, self.payoff, self.question))
 
 
-# These are general competitive fundamentals, not claims about exact map coordinates.
-# The board is explicitly labelled as a concept diagram in every video.
+# These are general competitive fundamentals. Map context and teaching routes are
+# attached below; none of the episodes claims to reproduce a specific demo.
 TACTICS: tuple[Tactic, ...] = (
     Tactic("trade-spacing", "Trade spacing", "Your teammate gets picked. Can you trade it?",
            "If you are too far back, the duel is already over.",
@@ -163,6 +164,63 @@ TACTICS: tuple[Tactic, ...] = (
            "Do you group or gamble on a solo peek?", ((.18,.83),(.48,.91),(.77,.83)), ((.31,.69),(.43,.61),(.56,.69)), 4),
 )
 
+# Contexts use the genuine CS2 radar artwork. The pins and routes are teaching
+# illustrations placed over recognizable areas, not demo-derived lineups.
+# Coordinates are normalized to the radar image (top-left is 0,0).
+MAP_CONTEXT: dict[str, tuple[str, str, str, tuple[float, float], tuple[float, float]]] = {
+    "trade-spacing": ("de_mirage", "MIRAGE", "TOP MID → CONNECTOR", (.52,.55), (.59,.44)),
+    "two-v-one": ("de_dust2", "DUST II", "A LONG → A SITE", (.19,.44), (.25,.25)),
+    "anti-eco": ("de_inferno", "INFERNO", "APARTMENTS → B SITE", (.25,.47), (.72,.27)),
+    "flash-entry": ("de_ancient", "ANCIENT", "MID → DONUT", (.50,.51), (.38,.39)),
+    "post-plant": ("de_mirage", "MIRAGE", "A SITE → JUNGLE", (.61,.25), (.51,.32)),
+    "late-round": ("de_anubis", "ANUBIS", "A MAIN → A SITE", (.28,.31), (.34,.23)),
+    "rotate-info": ("de_inferno", "INFERNO", "MID → B / BANANA", (.50,.51), (.75,.42)),
+    "reposition": ("de_dust2", "DUST II", "LONG → CAR / A SITE", (.18,.42), (.25,.26)),
+    "deny-isolation": ("de_anubis", "ANUBIS", "MID → A MAIN", (.50,.50), (.29,.31)),
+    "retake-utility": ("de_ancient", "ANCIENT", "CT → B SITE", (.48,.20), (.73,.27)),
+    "protect-utility": ("de_overpass", "OVERPASS", "A SITE → CONNECTOR", (.28,.25), (.48,.48)),
+    "trade-not-chase": ("de_mirage", "MIRAGE", "B APARTMENTS → B SITE", (.23,.48), (.29,.32)),
+    "sound-discipline": ("de_dust2", "DUST II", "B TUNNELS → B SITE", (.76,.60), (.76,.27)),
+    "crossfire": ("de_inferno", "INFERNO", "B SITE CROSSFIRE", (.71,.28), (.80,.30)),
+    "hold-discipline": ("de_mirage", "MIRAGE", "A RAMP → A SITE", (.76,.33), (.63,.25)),
+    "focus-fire": ("de_anubis", "ANUBIS", "B MAIN → B SITE", (.69,.31), (.75,.23)),
+    "cover-the-defuse": ("de_ancient", "ANCIENT", "B SITE → CT LANE", (.73,.27), (.55,.23)),
+    "regroup-after-pick": ("de_overpass", "OVERPASS", "B SHORT → MONSTER", (.57,.48), (.68,.59)),
+    "watch-flank": ("de_mirage", "MIRAGE", "A EXECUTE / FLANK", (.72,.33), (.56,.29)),
+    "play-the-clock": ("de_dust2", "DUST II", "MID → B SITE", (.52,.52), (.76,.27)),
+}
+
+RADAR_BASE_URL = "https://raw.githubusercontent.com/MurkyYT/cs2-map-icons/main/images/radars"
+
+
+def _load_radar(map_id: str) -> Image.Image:
+    """Load and cache official CS2 radar artwork for an episode's map."""
+    cache_dir = Path(os.getenv("CS2_MAP_CACHE", "data/maps"))
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    path = cache_dir / f"{map_id}_radar_psd.png"
+    if not path.exists():
+        request = urllib.request.Request(
+            f"{RADAR_BASE_URL}/{map_id}_radar_psd.png",
+            headers={"User-Agent": "CS2-Round-IQ/1.0 (automated video renderer)"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=25) as response:
+                data = response.read()
+            if not data.startswith(b"\x89PNG\r\n\x1a\n"):
+                raise RuntimeError("map asset response was not a PNG")
+            temp = path.with_suffix(".tmp")
+            temp.write_bytes(data)
+            temp.replace(path)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Could not fetch the CS2 radar for {map_id}; check GitHub Actions network access."
+            ) from exc
+    try:
+        with Image.open(path) as source:
+            return source.convert("RGBA")
+    except Exception as exc:
+        raise RuntimeError(f"Invalid cached CS2 radar image: {path}") from exc
+
 
 @dataclass
 class TacticCopy:
@@ -183,10 +241,14 @@ def build_tactic_copy(tactic: Tactic) -> TacticCopy:
     if not tactic.hook.endswith("?") and len(tactic.hook.split()) > 12:
         raise ValueError(f"Tactic cold open must be short: {tactic.key}")
     title = f"CS2 Round IQ: {tactic.title}"
+    map_name = MAP_CONTEXT[tactic.key][1]
+    callout = MAP_CONTEXT[tactic.key][2]
     description = (
-        f"One CS2 tactical concept: {tactic.title}. The animation is an original concept diagram, "
-        "not an exact in-game map or a claim about fixed coordinates. Use it to discuss the decision, "
-        "then adapt it to your team and the current round.\n\n"
+        f"One CS2 tactical concept on the real {map_name} radar, around {callout}. "
+        "The route is an educational illustration, not to scale, not captured demo data, "
+        "and not an exact grenade lineup. "
+        "Adapt it to your team, side and the current round.\n\n"
+        "Map radar artwork © Valve Corporation; sourced from MurkyYT/cs2-map-icons.\n\n"
         "#CS2 #CounterStrike2 #CS2Tips #CS2Tactics"
     )
     return TacticCopy(title[:100], description, ["CS2", "Counter-Strike 2", "CS2 tactics", "CS2 tips"],
@@ -227,7 +289,8 @@ def _background() -> Image.Image:
     return image
 
 
-def _draw_frame(tactic: Tactic, episode: int, phase: int) -> Image.Image:
+def _draw_frame(tactic: Tactic, episode: int, phase: int,
+                radar: Image.Image | None = None) -> Image.Image:
     if not 0 <= phase < 10:
         raise ValueError("Tactic frame phase must be between 0 and 9")
     image = _background()
@@ -251,90 +314,45 @@ def _draw_frame(tactic: Tactic, episode: int, phase: int) -> Image.Image:
         _text(draw, line, (64, y), font_size, WHITE if phase != 4 else accent, True)
         y += font_size + 18
 
-    # Diagram is an abstract training board. It intentionally avoids map names/coordinates.
+    map_id, map_name, callout, start, target = MAP_CONTEXT[tactic.key]
+    radar = radar or _load_radar(map_id)
     bx1, by1, bx2, by2 = 74, 500, 1006, 1318
-    draw.rounded_rectangle((bx1, by1, bx2, by2), radius=38, fill=PANEL, outline=(54, 79, 92), width=3)
-    for x in range(bx1 + 36, bx2, 70):
-        draw.line((x, by1 + 28, x, by2 - 28), fill=GRID, width=1)
-    for yy in range(by1 + 32, by2, 70):
-        draw.line((bx1 + 28, yy, bx2 - 28, yy), fill=GRID, width=1)
-    draw.rounded_rectangle((bx1 + 38, by1 + 38, bx2 - 38, by2 - 38), radius=30,
-                           outline=(64, 91, 103), width=5)
-    # Five abstract board geometries keep the series visually varied without claiming
-    # to reproduce a real CS2 map or exact grenade lineup.
-    lane_color = (73, 102, 113)
-    left, right = bx1 + 70, bx2 - 70
-    top, bottom = by1 + 105, by2 - 80
-    middle_x, middle_y = W // 2, (top + bottom) // 2
-    layout = tactic.lane % 5
-    if layout == 0:  # open lanes
-        for offset in (-1, 0, 1):
-            ymid = middle_y + offset * 116
-            draw.line((left, ymid, right, ymid), fill=lane_color, width=11)
-        blocks = ((bx1+265,by1+145,bx1+405,by1+285),(bx1+620,by1+424,bx1+760,by1+565),(bx1+375,by1+624,bx1+555,by1+722))
-    elif layout == 1:  # offset S route
-        draw.line((left, bottom-65, bx1+390, middle_y+120, bx2-390, middle_y-100, right, top+100), fill=lane_color, width=13, joint="curve")
-        draw.line((bx1+390,middle_y+120,bx1+390,top+120), fill=lane_color, width=10)
-        draw.line((bx2-390,middle_y-100,bx2-390,bottom-75), fill=lane_color, width=10)
-        blocks = ((bx1+180,by1+145,bx1+315,by1+275),(bx1+650,by1+420,bx1+810,by1+565),(bx1+390,by1+570,bx1+565,by1+690))
-    elif layout == 2:  # T junction
-        draw.line((middle_x, top, middle_x, bottom), fill=lane_color, width=13)
-        draw.line((left, middle_y-130, right, middle_y-130), fill=lane_color, width=11)
-        draw.line((left, middle_y+135, right, middle_y+135), fill=lane_color, width=11)
-        blocks = ((bx1+180,by1+340,bx1+330,by1+485),(bx1+650,by1+155,bx1+805,by1+305),(bx1+650,by1+620,bx1+810,by1+755))
-    elif layout == 3:  # crossing routes
-        draw.line((left, top+120, right, bottom-120), fill=lane_color, width=13)
-        draw.line((left, bottom-120, right, top+120), fill=lane_color, width=13)
-        draw.line((middle_x, top, middle_x, bottom), fill=(54,78,90), width=7)
-        blocks = ((bx1+205,by1+165,bx1+355,by1+310),(bx1+655,by1+165,bx1+805,by1+310),(bx1+420,by1+600,bx1+590,by1+735))
-    else:  # connected rooms
-        draw.line((left, middle_y, right, middle_y), fill=lane_color, width=12)
-        draw.line((middle_x, top, middle_x, bottom), fill=lane_color, width=12)
-        draw.line((bx1+280,by1+230,bx1+420,by1+390), fill=(54,78,90), width=8)
-        draw.line((bx1+680,by1+540,bx1+820,by1+690), fill=(54,78,90), width=8)
-        blocks = ((bx1+180,by1+155,bx1+340,by1+315),(bx1+650,by1+155,bx1+810,by1+315),(bx1+400,by1+580,bx1+580,by1+740))
-    for index, box in enumerate(blocks):
-        draw.rounded_rectangle(box, radius=18 if index < 2 else 26,
-                               fill=(28, 46, 58), outline=(82, 111, 121), width=3)
-    _text(draw, "CONCEPT DIAGRAM  ·  NOT TO SCALE", (W // 2, by1 + 30), 17, MUTED, True, anchor="mt")
+    draw.rounded_rectangle((bx1, by1, bx2, by2), radius=32, fill=(7, 12, 18), outline=(54, 79, 92), width=3)
+    map_box = (bx1 + 28, by1 + 82, bx2 - 28, by2 - 24)
+    map_w, map_h = map_box[2] - map_box[0], map_box[3] - map_box[1]
+    fitted = ImageOps.contain(radar, (map_w, map_h))
+    px = map_box[0] + (map_w - fitted.width) // 2
+    py = map_box[1] + (map_h - fitted.height) // 2
+    # Keep the authentic radar readable while giving it a restrained broadcast frame.
+    image.paste(fitted.convert("RGB"), (px, py))
+    draw.rounded_rectangle((bx1 + 20, by1 + 20, bx1 + 226, by1 + 70), radius=16,
+                           fill=(9, 18, 27), outline=(57, 85, 99), width=2)
+    _text(draw, map_name, (bx1 + 40, by1 + 45), 22, WHITE, True, anchor="lm")
+    callout_box = (bx2 - 518, by1 + 20, bx2 - 20, by1 + 70)
+    draw.rounded_rectangle(callout_box, radius=16, fill=(9, 18, 27), outline=accent, width=2)
+    _text(draw, callout, ((callout_box[0] + callout_box[2]) // 2, by1 + 45),
+          17, accent, True, anchor="mm")
 
+    # The highlighted route points to the named areas on the real radar. It is a
+    # teaching illustration, not a demo recording or exact grenade lineup.
+    scale_x, scale_y = fitted.width, fitted.height
     def point(pos: tuple[float, float]) -> tuple[float, float]:
-        return (bx1 + pos[0] * (bx2 - bx1), by1 + pos[1] * (by2 - by1))
+        return (px + pos[0] * scale_x, py + pos[1] * scale_y)
 
-    start, target = tactic.setup_positions, tactic.target_positions
-    if phase <= 2:
-        positions = start
-    elif phase <= 5:
-        t = min(.82, (phase - 2) * .27)
-        positions = tuple((a[0] * (1-t) + b[0] * t, a[1] * (1-t) + b[1] * t) for a, b in zip(start, target))
-    else:
-        positions = target
-
-    # A short movement every scene plus a highlighted route makes the visual teach the action.
-    if 3 <= phase <= 5:
-        progress = min(1.0, (phase - 2) / 3)
-        for i, (a, b) in enumerate(zip(start[:2], target[:2])):
-            partial = (a[0] * (1-progress) + b[0] * progress,
-                       a[1] * (1-progress) + b[1] * progress)
-            _arrow(draw, point(a), point(partial), accent if i == 0 else GOLD, width=8)
-    elif phase == 0:
-        _arrow(draw, point(start[0]), point(start[2]), (104, 124, 135), width=5)
-
-    if phase == 2:
-        x, yy = point(start[0])
-        draw.ellipse((x-66, yy-66, x+66, yy+66), outline=GOLD, width=6)
-    if phase == 7:
-        for pos in target[:2]:
-            x, yy = point(pos)
-            draw.ellipse((x-56, yy-56, x+56, yy+56), outline=GOLD, width=5)
-
-    for idx, pos in enumerate(positions):
-        color = CYAN if idx < 2 else CORAL
-        x, yy = point(pos)
-        radius = 34
-        draw.ellipse((x-radius-6, yy-radius-6, x+radius+6, yy+radius+6), fill=(10, 17, 25), outline=color, width=6)
-        draw.ellipse((x-radius, yy-radius, x+radius, yy+radius), fill=color)
-        _text(draw, "T" if idx < 2 else "CT", (x, yy), 18, BG, True, anchor="mm")
+    t = 0.0 if phase < 3 else min(1.0, (phase - 2) / 5)
+    moving = (start[0] * (1 - t) + target[0] * t,
+              start[1] * (1 - t) + target[1] * t)
+    a, b = point(start), point(target)
+    current = point(moving)
+    if phase >= 3:
+        _arrow(draw, a, current, accent, width=10)
+    for x, y, color in ((a[0], a[1], CYAN), (b[0], b[1], CORAL)):
+        radius = 19
+        draw.ellipse((x-radius, y-radius, x+radius, y+radius), fill=(8, 17, 25), outline=color, width=7)
+    draw.ellipse((current[0]-12, current[1]-12, current[0]+12, current[1]+12), fill=WHITE)
+    if phase in (0, 2, 6, 8):
+        x, y = current
+        draw.ellipse((x-42, y-42, x+42, y+42), outline=GOLD, width=4)
     # Phase badge and animated progress indicator.
     labels = ["THE PROBLEM", "THE RISK", "THE RISK", "THE MOVE", "THE MOVE",
               "THE MOVE", "THE ADVANTAGE", "THE ADVANTAGE", "DISCUSS", "DISCUSS"]
@@ -410,10 +428,11 @@ def render_tactic(tactic: Tactic, episode: int, output_path: Path,
 
     frame_dir = data_dir / f"tactic-{tactic.key}"
     frame_dir.mkdir(parents=True, exist_ok=True)
+    radar = _load_radar(MAP_CONTEXT[tactic.key][0])
     frames = []
     for phase in range(10):
         frame_path = frame_dir / f"phase-{phase}.png"
-        _draw_frame(tactic, episode, phase).save(frame_path, optimize=True)
+        _draw_frame(tactic, episode, phase, radar).save(frame_path, optimize=True)
         frames.append(frame_path)
 
     total = max(16.0, speech_duration + .35)
@@ -479,7 +498,8 @@ def run() -> Path:
     metadata = {"series": "CS2 Round IQ", "tactic_key": tactic.key, "episode": episode,
                 "title": copy.title, "narration": copy.narration, "duration_seconds": round(duration, 2),
                 "video_file": str(video_path), "upload_enabled": cfg.upload_enabled,
-                "visuals": "original animated concept diagrams; not to scale"}
+                "map": MAP_CONTEXT[tactic.key][1], "callouts": MAP_CONTEXT[tactic.key][2],
+                "visuals": "official CS2 radar art with illustrative route; not demo-derived"}
     metadata_path = video_path.with_suffix(".json")
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     log.info("Rendered CS2 Round IQ: %s (%s seconds)", video_path, round(duration, 1))

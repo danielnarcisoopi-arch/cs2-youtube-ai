@@ -1,4 +1,6 @@
 import json
+import io
+from PIL import Image
 
 from cs2_shorts.tactics import (
     TACTICS,
@@ -6,6 +8,8 @@ from cs2_shorts.tactics import (
     _record_published,
     build_tactic_copy,
     choose_tactic,
+    MAP_CONTEXT,
+    _load_radar,
 )
 
 
@@ -21,7 +25,9 @@ def test_each_episode_has_a_short_hook_and_original_conversational_narration():
         assert len(tactic.hook.split()) <= 12
         assert 35 <= len(copy.narration.split()) <= 76
         assert copy.narration.endswith(tactic.question)
+        assert "real" in copy.description
         assert "not to scale" in copy.description
+        assert "not captured demo data" in copy.description
         assert copy.title.startswith("CS2 Round IQ:")
 
 
@@ -39,10 +45,34 @@ def test_tactic_history_advances_and_does_not_repeat_until_the_bank_is_used(tmp_
     assert next_tactic.key == TACTICS[0].key
 
 
-def test_renderer_makes_vertical_phase_art_with_visual_changes():
-    first = _draw_frame(TACTICS[0], 1, 0)
-    action = _draw_frame(TACTICS[0], 1, 5)
-    cta = _draw_frame(TACTICS[0], 1, 9)
+def test_every_tactic_uses_a_real_map_context_with_named_callouts():
+    assert set(MAP_CONTEXT) == {tactic.key for tactic in TACTICS}
+    assert all(map_id.startswith("de_") and map_name and callout
+               for map_id, map_name, callout, _start, _target in MAP_CONTEXT.values())
+
+
+def test_map_radar_download_is_cached_and_reopened(monkeypatch, tmp_path):
+    source = io.BytesIO()
+    Image.new("RGBA", (32, 32), (20, 40, 60, 255)).save(source, format="PNG")
+    png = source.getvalue()
+    calls = []
+
+    def fake_open(request, timeout):
+        calls.append(request.full_url)
+        return io.BytesIO(png)
+
+    monkeypatch.setenv("CS2_MAP_CACHE", str(tmp_path))
+    monkeypatch.setattr("cs2_shorts.tactics.urllib.request.urlopen", fake_open)
+    assert _load_radar("de_mirage").size == (32, 32)
+    assert _load_radar("de_mirage").size == (32, 32)
+    assert len(calls) == 1
+
+
+def test_renderer_makes_vertical_phase_art_over_a_real_map_backdrop():
+    radar = Image.new("RGBA", (512, 512), (74, 82, 71, 255))
+    first = _draw_frame(TACTICS[0], 1, 0, radar)
+    action = _draw_frame(TACTICS[0], 1, 5, radar)
+    cta = _draw_frame(TACTICS[0], 1, 9, radar)
     assert first.size == (1080, 1920)
     assert first.tobytes() != action.tobytes()
     assert action.tobytes() != cta.tobytes()
