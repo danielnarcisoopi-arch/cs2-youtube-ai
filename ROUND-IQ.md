@@ -6,8 +6,8 @@ This is a separate daily Shorts workflow for tactical fundamentals. It does not 
 
 - The first episode bank contains 20 individually written round concepts.
 - Each narration has a short question-led opening, a situation, an actionable choice, a reason, and a comment prompt.
-- Ten vertical keyframes use the matching CS2 radar artwork and animate a highlighted route between named map areas, with a new visual beat about every two seconds.
-- Map radars are fetched from the auto-updated `MurkyYT/cs2-map-icons` mirror of Valve's game assets and cached under `data/maps`. The map art is Valve property. The marker path is an educational illustration; it is not reconstructed from a match demo and does not claim to be an exact grenade lineup.
+- Ten vertical keyframes use matching CS2 radar artwork and place markers at named callout anchors. The focus shifts between the real callout points, with a new visual beat about every two seconds; it does not draw a guessed straight line across the map.
+- Map radars are fetched from the auto-updated `MurkyYT/cs2-map-icons` mirror of Valve's game assets; normalized callout anchors are fetched from `UsrUnknow/cs2-radar-callouts`. Both are cached under `data/maps`. Map art is Valve property. The callout dots use named location anchors, not player coordinates reconstructed from a match demo.
 - Edge neural narration is used first, with the existing local Piper voice as fallback. The soundtrack is generated locally unless a cleared music file is configured.
 - Published episodes are tracked in `data/tactics-history.json`; the workflow rotates through the 20 concepts before starting the list again.
 

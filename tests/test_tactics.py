@@ -10,6 +10,7 @@ from cs2_shorts.tactics import (
     choose_tactic,
     MAP_CONTEXT,
     _load_radar,
+    _load_callouts,
 )
 
 
@@ -47,8 +48,8 @@ def test_tactic_history_advances_and_does_not_repeat_until_the_bank_is_used(tmp_
 
 def test_every_tactic_uses_a_real_map_context_with_named_callouts():
     assert set(MAP_CONTEXT) == {tactic.key for tactic in TACTICS}
-    assert all(map_id.startswith("de_") and map_name and callout
-               for map_id, map_name, callout, _start, _target in MAP_CONTEXT.values())
+    assert all(map_id.startswith("de_") and map_name and source and target
+               for map_id, map_name, source, target in MAP_CONTEXT.values())
 
 
 def test_map_radar_download_is_cached_and_reopened(monkeypatch, tmp_path):
@@ -68,11 +69,33 @@ def test_map_radar_download_is_cached_and_reopened(monkeypatch, tmp_path):
     assert len(calls) == 1
 
 
+def test_callout_coordinates_are_downloaded_cached_and_normalized(monkeypatch, tmp_path):
+    data = json.dumps({"callouts": [
+        {"name": "Top Mid", "x": 0.42, "y": 0.51},
+        {"name": "Connector", "x": 0.61, "y": 0.39},
+    ]}).encode()
+    calls = []
+
+    def fake_open(request, timeout):
+        calls.append(request.full_url)
+        return io.BytesIO(data)
+
+    monkeypatch.setenv("CS2_MAP_CACHE", str(tmp_path))
+    monkeypatch.setattr("cs2_shorts.tactics.urllib.request.urlopen", fake_open)
+    first = _load_callouts("de_mirage")
+    second = _load_callouts("de_mirage")
+    assert first == {"topmid": (.42, .51), "connector": (.61, .39)}
+    assert second == first
+    assert len(calls) == 1
+
+
 def test_renderer_makes_vertical_phase_art_over_a_real_map_backdrop():
     radar = Image.new("RGBA", (512, 512), (74, 82, 71, 255))
-    first = _draw_frame(TACTICS[0], 1, 0, radar)
-    action = _draw_frame(TACTICS[0], 1, 5, radar)
-    cta = _draw_frame(TACTICS[0], 1, 9, radar)
+    tactic = TACTICS[0]
+    positions = {"topmid": (.45, .55), "connector": (.58, .45)}
+    first = _draw_frame(tactic, 1, 0, radar, positions)
+    action = _draw_frame(tactic, 1, 5, radar, positions)
+    cta = _draw_frame(tactic, 1, 9, radar, positions)
     assert first.size == (1080, 1920)
     assert first.tobytes() != action.tobytes()
     assert action.tobytes() != cta.tobytes()
