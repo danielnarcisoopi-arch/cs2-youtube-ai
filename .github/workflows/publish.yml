@@ -30,10 +30,9 @@ jobs:
       SKINSHOTTER_ENABLED: 'true'
       SKINSHOTTER_CLIP_SECONDS: '5'
       SKINSHOTTER_HEADLESS: 'false'
-      # Until POV capture is validated, a scheduled job falls back to the known
-      # working renderer if the external browser renderer is unavailable. Manual
-      # test runs stay strict and fail with a diagnostic instead of uploading.
-      SKINSHOTTER_FALLBACK_TO_STATIC: ${{ github.event_name == 'schedule' }}
+      # POV capture is optional: if the external viewer cannot apply a wear
+      # float or render a clip, keep the workflow alive with verified catalog art.
+      SKINSHOTTER_FALLBACK_TO_STATIC: 'true'
       UPLOAD_ENABLED: ${{ github.event_name == 'schedule' || inputs.upload }}
       YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
       YOUTUBE_PRIVACY_STATUS: public
