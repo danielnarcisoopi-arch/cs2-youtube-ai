@@ -63,7 +63,7 @@ PLAYS: tuple[PlayScenario, ...] = (
                  "de_ancient", "ANCIENT", "Middle", "B Site", "B",
                  "Five attackers are grouping through mid toward B. One flash breaks the held angle, then the first pair clears together while the next players cover the trade and flank. Notice the pause before the final swing: entering one by one would give the defenders five separate duels. Would you flash first or smoke the plant?", "FLASH POP  ·  B EXECUTE"),
     PlayScenario("anubis-b-execute", "The Anubis B split", "Can the split arrive together, or does it become three solo fights?",
-                 "de_anubis", "ANUBIS", "B Main", "B Site", "B",
+                 "de_anubis", "ANUBIS", "Canal", "B Site", "B",
                  "The B hit only works if the group reaches the site on one timing. The lead pair draws attention, the flash creates the opening, and the last players stay close enough to trade instead of chasing separate fights. The defenders start to collapse onto the site, so the attackers need to secure space and plant. Would you commit now or wait for the late player?", "FLASH POP  ·  B SPLIT"),
 )
 

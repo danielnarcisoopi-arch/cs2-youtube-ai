@@ -8,6 +8,7 @@ from cs2_shorts.plays import (
     build_play_copy,
     choose_play,
 )
+from cs2_shorts.tactics import _resolve_callout
 
 
 def test_playbook_has_distinct_scenarios_and_explicit_simulation_disclosure():
@@ -44,3 +45,18 @@ def test_five_v_five_play_frame_uses_real_radar_backdrop_and_moves_over_time():
     later = _draw_play_frame(play, 1, 60, radar, callouts)
     assert early.size == (1080, 1920)
     assert early.tobytes() != later.tobytes()
+
+
+def test_anubis_b_split_uses_published_callouts_instead_of_missing_b_main():
+    play = next(play for play in PLAYS if play.key == "anubis-b-execute")
+    callouts = {
+        "tspawn": (.10, .72), "canal": (.22, .60), "mid": (.38, .50),
+        "palace": (.20, .35), "asite": (.48, .28), "flower": (.55, .35),
+        "ctspawn": (.70, .45), "bsite": (.60, .72), "connector": (.45, .62),
+        "alley": (.35, .72),
+    }
+    assert play.attackers_start == "Canal"
+    assert _resolve_callout(callouts, play.attackers_start) == callouts["canal"]
+    assert _resolve_callout(callouts, play.bombsite) == callouts["bsite"]
+    frame = _draw_play_frame(play, 1, 0, Image.new("RGB", (512, 512)), callouts)
+    assert frame.size == (1080, 1920)
