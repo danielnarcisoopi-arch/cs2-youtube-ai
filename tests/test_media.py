@@ -110,4 +110,4 @@ def test_normal_tts_keeps_its_natural_speed_and_promo_cards_readable():
     durations, speed = media._scene_timing([2.0, 2.4, 2.2])
 
     assert speed == 1.0
-    assert durations == [2.8, 2.68, 6.52]
+    assert [round(value, 2) for value in durations] == [2.8, 2.68, 6.52]
