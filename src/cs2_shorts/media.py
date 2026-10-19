@@ -503,7 +503,7 @@ def render_video(copy: VideoCopy, currency: str, data_dir: Path, output_path: Pa
     if skinshotter_enabled:
         # Keep capture inside the Actions job: no game server or manual recording.
         # Import lazily so local static renders and test environments do not need Chromium.
-        from .skinshotter import capture_skin_clips
+        from .skinshotter import SkinshotterRouteNotFoundError, capture_skin_clips
 
         try:
             catalog = _skin_catalog(data_dir, image_timeout)
@@ -515,6 +515,12 @@ def render_video(copy: VideoCopy, currency: str, data_dir: Path, output_path: Pa
                 "renderer": "Skinshotter POV", "clips": len(clips),
             }, indent=2), encoding="utf-8")
             return final_duration
+        except SkinshotterRouteNotFoundError as exc:
+            log.warning("Skinshotter has no page for a selected item; rendering the Short with catalog artwork: %s", exc)
+            status_path.write_text(json.dumps({
+                "renderer": "static catalog art (Skinshotter route missing)",
+                "error": f"{type(exc).__name__}: {exc}",
+            }, indent=2), encoding="utf-8")
         except Exception as exc:
             if not skinshotter_fallback_to_static:
                 raise

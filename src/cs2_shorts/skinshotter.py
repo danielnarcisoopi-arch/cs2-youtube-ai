@@ -24,6 +24,21 @@ _CATEGORY = {
 }
 
 
+class SkinshotterRouteNotFoundError(RuntimeError):
+    """A catalog-derived Skinshotter page does not exist and needs static fallback."""
+
+
+def _check_page_response(response, url: str) -> None:
+    """Keep a missing item route distinct from browser or viewer failures."""
+    if response is None:
+        return
+    status = response.status
+    if status == 404:
+        raise SkinshotterRouteNotFoundError(f"Skinshotter route returned HTTP 404: {url}")
+    if status >= 400:
+        raise RuntimeError(f"Skinshotter returned HTTP {status} for {url}")
+
+
 def _slug(value: str) -> str:
     value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
     value = re.sub(r"[^a-zA-Z0-9]+", "-", value).strip("-").lower()
@@ -223,8 +238,7 @@ async def _capture_pages(pages: list[tuple[str, str, float]], out_dir: Path, sec
                     response = await page.goto(url, wait_until="domcontentloaded", timeout=60_000)
                     entry["http_status"] = response.status if response else None
                     entry["response_url"] = response.url if response else page.url
-                    if response and response.status >= 400:
-                        raise RuntimeError(f"Skinshotter returned HTTP {response.status} for {url}")
+                    _check_page_response(response, url)
                     entry["webgpu"] = await page.evaluate("""async () => {
                       if (!navigator.gpu) return {supported:false, reason:'navigator.gpu missing'};
                       try {
@@ -431,6 +445,10 @@ def capture_skin_clips(items: list[dict], catalog: list[dict], out_dir: Path,
             report = {"renderer": "Skinshotter WebGPU via Playwright", "captures": []}
         report.update({"result": "failed", "error": f"{type(exc).__name__}: {exc}"})
         report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+        if isinstance(exc, SkinshotterRouteNotFoundError):
+            raise SkinshotterRouteNotFoundError(
+                f"Skinshotter POV capture could not find a selected skin page: {exc}"
+            ) from exc
         raise RuntimeError(f"Skinshotter POV capture failed: {type(exc).__name__}: {exc}") from exc
     if report["result"] != "passed" or len(report["captures"]) != len(items):
         raise RuntimeError("Skinshotter did not return a clip for every selected item")
