@@ -11,6 +11,7 @@ from cs2_shorts.tactics import (
     MAP_CONTEXT,
     _load_radar,
     _load_callouts,
+    _resolve_callout,
 )
 
 
@@ -50,6 +51,23 @@ def test_every_tactic_uses_a_real_map_context_with_named_callouts():
     assert set(MAP_CONTEXT) == {tactic.key for tactic in TACTICS}
     assert all(map_id.startswith("de_") and map_name and source and target
                for map_id, map_name, source, target in MAP_CONTEXT.values())
+
+
+def test_all_anubis_routes_use_callouts_that_exist_in_the_published_map_data():
+    # This is the current upstream de_anubis.json callout set. It intentionally
+    # contains no A Main or B Main entry; earlier route labels crashed on these.
+    points = {
+        "tspawn": (.10, .72), "canal": (.22, .60), "mid": (.38, .50),
+        "palace": (.20, .35), "asite": (.48, .28), "flower": (.55, .35),
+        "ctspawn": (.70, .45), "bsite": (.60, .72), "connector": (.45, .62),
+        "alley": (.35, .72),
+    }
+    anubis_keys = ("late-round", "deny-isolation", "focus-fire", "regroup-after-pick")
+    for key in anubis_keys:
+        map_id, _map_name, source, target = MAP_CONTEXT[key]
+        assert map_id == "de_anubis"
+        assert _resolve_callout(points, source) == points[source.replace(" ", "").lower()]
+        assert _resolve_callout(points, target) == points[target.replace(" ", "").lower()]
 
 
 def test_map_radar_download_is_cached_and_reopened(monkeypatch, tmp_path):
