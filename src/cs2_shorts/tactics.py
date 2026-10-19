@@ -13,6 +13,8 @@ from zoneinfo import ZoneInfo
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
+from .promotion import PROMO_MESSAGE, add_promo_link
+
 log = logging.getLogger(__name__)
 W, H = 1080, 1920
 BG = (8, 14, 23)
@@ -321,7 +323,7 @@ def build_tactic_copy(tactic: Tactic) -> TacticCopy:
     title = f"CS2 Round IQ: {tactic.title}"
     _, map_name, source_callout, target_callout = MAP_CONTEXT[tactic.key]
     callout = f"{source_callout} → {target_callout}"
-    description = (
+    description = add_promo_link(
         f"One CS2 tactical concept on the real {map_name} radar, around {callout}. "
         "The markers illustrate a tactical idea, not to scale, not captured demo data, "
         "and not an exact grenade lineup. "
@@ -382,6 +384,11 @@ def _draw_frame(tactic: Tactic, episode: int, phase: int,
     for line in lines:
         _text(draw, line, (64, y), font_size, WHITE if phase != 4 else accent, True)
         y += font_size + 18
+
+    if phase == 0:
+        draw.rounded_rectangle((102, 420, 978, 474), radius=18,
+                               fill=(9, 18, 27), outline=accent, width=2)
+        _text(draw, PROMO_MESSAGE, (540, 447), 22, accent, True, anchor="mm")
 
     map_id, map_name, source_name, target_name = MAP_CONTEXT[tactic.key]
     callout = f"{source_name.upper()} → {target_name.upper()}"

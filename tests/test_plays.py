@@ -18,6 +18,7 @@ def test_playbook_has_distinct_scenarios_and_explicit_simulation_disclosure():
         assert copy.title.startswith("CS2 Playbook:")
         assert "not captured demo footage" in copy.description
         assert "illustrative" in copy.description.lower()
+        assert copy.description.startswith("10$ FREE SKIN: http://clash.gg/r/CSSKINNS")
 
 
 def test_play_history_rotates_independently(tmp_path):

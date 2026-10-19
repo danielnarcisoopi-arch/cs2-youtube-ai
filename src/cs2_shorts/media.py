@@ -16,6 +16,7 @@ import requests
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 from .scripts import VideoCopy
+from .promotion import PROMO_MESSAGE
 
 log = logging.getLogger(__name__)
 W, H = 1080, 1920
@@ -257,6 +258,9 @@ def make_scenes(copy: VideoCopy, currency: str, data_dir: Path,
         _text(draw, "CS2 MARKET", (88, 72), 19, MUTED, True, anchor="lm")
 
         if phase == "intro":
+            draw.rounded_rectangle((90, 184, 990, 258), radius=24,
+                                   fill=(5, 9, 15), outline=LIME, width=3)
+            _text(draw, PROMO_MESSAGE, (540, 221), 27, LIME, True, anchor="mm")
             _draw_weapon(frame, art_path, (15, 300, 1065, 1250), .96)
             headline, subline = _hook_overlay(copy, currency)
             _text(draw, headline, (540, 1325), 75, WHITE, True, anchor="mm")
@@ -365,6 +369,9 @@ def _pov_overlay(copy: VideoCopy, currency: str, phase: str, index: int,
     _text(draw, "CS2  /  MARKET", (90, 81), 20, WHITE, True, anchor="lm")
 
     if phase == "hook":
+        draw.rounded_rectangle((44, 458, 900, 520), radius=20,
+                               fill=(5, 9, 15, 215), outline=LIME, width=3)
+        _text(draw, PROMO_MESSAGE, (472, 489), 25, LIME, True, anchor="mm")
         headline, subline = _hook_overlay(copy, currency)
         draw.rounded_rectangle((44, 136, 880, 438), radius=28, fill=(4, 8, 13, 155))
         _text(draw, headline, (76, 178), 84 if len(headline) < 12 else 68, LIME, True)

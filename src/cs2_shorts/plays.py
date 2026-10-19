@@ -24,6 +24,7 @@ from .tactics import (
     BG, GOLD, H, MUTED, W, WHITE, _background, _load_callouts, _load_radar,
     _resolve_callout, _text, _wrap,
 )
+from .promotion import PROMO_MESSAGE, add_promo_link
 
 log = logging.getLogger(__name__)
 FPS = 6
@@ -76,7 +77,7 @@ class PlayCopy:
 
 
 def build_play_copy(play: PlayScenario) -> PlayCopy:
-    description = (
+    description = add_promo_link(
         f"Illustrative 5v5 CS2 tactical simulation on the {play.map_name} radar. "
         "Player routes and utility are animated for teaching; this is not captured demo footage, "
         "a verified pro play, or an exact grenade lineup. Use it as a discussion prompt.\n\n"
@@ -146,6 +147,10 @@ def _draw_play_frame(play: PlayScenario, episode: int, frame: int,
     hook = play.hook if elapsed < 3.4 else play.title
     for i, line in enumerate(_wrap(hook, 31)):
         _text(draw, line, (66, 190 + i * 59), 46 if len(_wrap(hook, 31)) <= 2 else 39, WHITE, True)
+
+    if elapsed < 3.4:
+        draw.rounded_rectangle((94, 320, 986, 370), 18, fill=(8, 18, 27), outline=ATTACK, width=2)
+        _text(draw, PROMO_MESSAGE, (540, 345), 22, ATTACK, True, anchor="mm")
 
     draw.rounded_rectangle((64, 370, 1016, 430), 18, fill=(14, 26, 37), outline=(49, 69, 82), width=2)
     _text(draw, f"{play.map_name}  ·  {play.side} SITE EXECUTE", (88, 400), 19, WHITE, True, anchor="lm")

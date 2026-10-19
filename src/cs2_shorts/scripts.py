@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .promotion import add_promo_link
+
 
 @dataclass
 class VideoCopy:
@@ -141,8 +143,8 @@ def build_copy(topic: str, rows: list[dict[str, Any]], currency: str, spotlight:
     }
     title = (f"{len(items)} CS2 Skins: {labels.get(topic, 'Market Picks')}"
              if len(items) > 1 else f"{labels.get(topic, 'CS2 MARKET WATCH')}: {name}")
-    description = (
-        f"A quick CS2 skin market shortlist in {currency}, based on Skinport public market data. "
+    description = add_promo_link(
+        "A quick CS2 skin market shortlist in " + currency + ", based on Skinport public market data. "
         "Lowest listing prices are not sale prices. Historical changes compare the current snapshot "
         "with the nearest stored snapshot around the stated period; traded value is an estimate. "
         "Market information only, not a forecast or financial advice.\n\n"

@@ -33,6 +33,11 @@ def test_voice_copy_is_short_conversational_and_ends_with_a_question():
     assert "not a forecast" not in video.narration
 
 
+def test_description_starts_with_the_free_skin_referral_link():
+    video = build_copy("budget", [sample()], "EUR")
+    assert video.description.startswith("10$ FREE SKIN: http://clash.gg/r/CSSKINNS")
+
+
 def test_price_gap_variant_uses_actual_ask_sale_gap_and_delays_skin_name():
     video = build_copy("gainers", [sample()], "EUR", hook_variant="price_gap")
     hook, reveal = video.narration.split("It's the ", 1)

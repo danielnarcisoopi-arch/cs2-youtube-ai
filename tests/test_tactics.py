@@ -31,6 +31,7 @@ def test_each_episode_has_a_short_hook_and_original_conversational_narration():
         assert "not to scale" in copy.description
         assert "not captured demo data" in copy.description
         assert copy.title.startswith("CS2 Round IQ:")
+        assert copy.description.startswith("10$ FREE SKIN: http://clash.gg/r/CSSKINNS")
 
 
 def test_tactic_history_advances_and_does_not_repeat_until_the_bank_is_used(tmp_path):
