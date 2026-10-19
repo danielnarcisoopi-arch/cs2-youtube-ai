@@ -26,7 +26,7 @@ class Settings:
     image_timeout: int = int(os.getenv("IMAGE_TIMEOUT_SECONDS", "8"))
     skinshotter_enabled: bool = _bool("SKINSHOTTER_ENABLED", False)
     skinshotter_clip_seconds: float = float(os.getenv("SKINSHOTTER_CLIP_SECONDS", "5"))
-    skinshotter_fallback_to_static: bool = _bool("SKINSHOTTER_FALLBACK_TO_STATIC", False)
+    skinshotter_fallback_to_static: bool = _bool("SKINSHOTTER_FALLBACK_TO_STATIC", True)
     voice: str = os.getenv("EDGE_TTS_VOICE", "en-US-GuyNeural")
     upload_enabled: bool = _bool("UPLOAD_ENABLED", False)
     yt_token_json: str = os.getenv("YOUTUBE_TOKEN_JSON", "")
