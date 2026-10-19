@@ -89,8 +89,25 @@ def test_market_voiceover_has_a_matching_line_for_every_skin_and_promo_bookends(
     lines = media._voiceover_lines(copy, "EUR")
 
     assert len(lines) == 5
-    assert lines[0] == "Get a ten dollar free skin. The link is in the description."
-    assert "Number One. AK forty-seven Skin 0." in lines[1]
+    assert lines[0] == "Get a ten dollar free skin. Link in description."
+    assert "AK forty-seven Skin 0, lowest listing" in lines[1]
     assert "€1.50" in lines[1]
-    assert "Number Three. AK forty-seven Skin 2." in lines[3]
+    assert "AK forty-seven Skin 2, lowest listing" in lines[3]
     assert "Claim your ten dollar free skin." in lines[-1]
+
+
+def test_slow_tts_is_compressed_to_fit_the_short_limit_without_losing_scene_alignment():
+    durations, speed = media._scene_timing([8.0] * 7)
+
+    assert speed > 1.0
+    assert len(durations) == 7
+    assert sum(durations) <= 44.01
+    assert durations[0] >= 2.8
+    assert durations[-1] >= 3.2
+
+
+def test_normal_tts_keeps_its_natural_speed_and_promo_cards_readable():
+    durations, speed = media._scene_timing([2.0, 2.4, 2.2])
+
+    assert speed == 1.0
+    assert durations == [2.8, 2.68, 6.52]

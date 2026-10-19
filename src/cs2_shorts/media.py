@@ -487,14 +487,43 @@ def _render_pov_video(ffmpeg: str, ffprobe: str, copy: VideoCopy, currency: str,
 def _voiceover_lines(copy: VideoCopy, currency: str) -> list[str]:
     """Build one spoken beat for each matching promo or skin-price scene."""
     items = (copy.items or [copy.featured])[:5]
-    lines = ["Get a ten dollar free skin. The link is in the description."]
-    numbers = ("One", "Two", "Three", "Four", "Five")
-    for index, item in enumerate(items):
+    lines = ["Get a ten dollar free skin. Link in description."]
+    for item in items:
         name = _spoken_name(item["name"])
         price = _money(item.get("price"), currency)
-        lines.append(f"Number {numbers[index]}. {name}. Lowest listing: {price}.")
-    lines.append("Claim your ten dollar free skin. Use the link in the description.")
+        lines.append(f"{name}, lowest listing {price}.")
+    lines.append("Claim your ten dollar free skin. Link in description.")
     return lines
+
+
+def _scene_timing(speech_durations: list[float]) -> tuple[list[float], float]:
+    """Fit narration and readable promo cards inside the Shorts duration limit."""
+    if len(speech_durations) < 3 or any(value <= 0 for value in speech_durations):
+        raise ValueError("Aligned market narration needs positive promo, item, and outro durations")
+    minimums = [2.8, *([2.6] * (len(speech_durations) - 2)), 3.2]
+    pause = .28
+
+    def durations_at(speed: float) -> list[float]:
+        return [max(speech / speed + pause, minimum)
+                for speech, minimum in zip(speech_durations, minimums)]
+
+    speed = 1.0
+    scene_durations = durations_at(speed)
+    if sum(scene_durations) > 44.0:
+        low, high = 1.0, 1.25
+        while sum(durations_at(high)) > 44.0 and high < 4.0:
+            high = min(4.0, high * 1.25)
+        for _ in range(24):
+            middle = (low + high) / 2
+            if sum(durations_at(middle)) > 44.0:
+                low = middle
+            else:
+                high = middle
+        speed = high
+        scene_durations = durations_at(speed)
+    if sum(scene_durations) < 12:
+        scene_durations[-1] += 12 - sum(scene_durations)
+    return scene_durations, speed
 
 
 def _synthesize_aligned_voiceover(ffmpeg: str, ffprobe: str, copy: VideoCopy,
@@ -506,37 +535,33 @@ def _synthesize_aligned_voiceover(ffmpeg: str, ffprobe: str, copy: VideoCopy,
     speech_durations: list[float] = []
     for index, line in enumerate(lines):
         part = data_dir / f"voice-part-{index + 1:02d}.mp3"
-        asyncio.run(_synthesize(line, voice, part))
+        synthesized = asyncio.run(_synthesize(line, voice, part))
         result = subprocess.run(
             [ffprobe, "-v", "error", "-show_entries", "format=duration", "-of",
-             "default=noprint_wrappers=1:nokey=1", str(part)],
+             "default=noprint_wrappers=1:nokey=1", str(synthesized)],
             check=True, capture_output=True, text=True,
         )
         speech_duration = float(result.stdout.strip())
         if speech_duration <= 0:
             raise RuntimeError(f"Speech synthesis generated empty audio for beat {index + 1}")
-        paths.append(part)
+        paths.append(synthesized)
         speech_durations.append(speech_duration)
 
-    # Intro and outro stay visible long enough to read. Each price card remains
-    # on screen until its own spoken skin name and listing price have finished.
-    scene_durations = [max(speech_durations[0] + .45, 2.8)]
-    scene_durations.extend(max(value + .45, 3.2) for value in speech_durations[1:-1])
-    scene_durations.append(max(speech_durations[-1] + .45, 3.5))
-    if sum(scene_durations) < 12:
-        scene_durations[-1] += 12 - sum(scene_durations)
+    # Promo cards stay readable; item cards stay up through their own spoken
+    # name and price. Compress unusually slow TTS slightly, preserving pitch.
+    scene_durations, speed = _scene_timing(speech_durations)
+    if speed > 1.0:
+        log.warning("Skin-price narration exceeded 44 seconds at natural pace; applying %.2fx time compression", speed)
     duration = sum(scene_durations)
-    if duration > 45:
-        raise RuntimeError(f"Skin-price narration exceeds the 45-second Short limit: {duration:.2f}s")
 
     command = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error"]
     for path in paths:
         command.extend(["-i", str(path)])
     filters: list[str] = []
     for index, (speech_duration, scene_duration) in enumerate(zip(speech_durations, scene_durations)):
-        pad = max(0.01, scene_duration - speech_duration)
+        pad = max(0.01, scene_duration - speech_duration / speed)
         filters.append(
-            f"[{index}:a]aresample=44100,apad=pad_dur={pad:.4f},"
+            f"[{index}:a]atempo={speed:.5f},aresample=44100,apad=pad_dur={pad:.4f},"
             f"atrim=duration={scene_duration:.4f}[beat{index}]"
         )
     concat_inputs = "".join(f"[beat{index}]" for index in range(len(paths)))
