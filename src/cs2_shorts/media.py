@@ -15,7 +15,7 @@ import edge_tts
 import requests
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
-from .scripts import VideoCopy
+from .scripts import VideoCopy, _spoken_name
 from .promotion import PROMO_MESSAGE
 
 log = logging.getLogger(__name__)
@@ -235,7 +235,7 @@ def _draw_weapon(frame: Image.Image, art_path: Path | None, box: tuple[int, int,
 
 def make_scenes(copy: VideoCopy, currency: str, data_dir: Path,
                 image_fetch: bool = True, image_timeout: int = 8) -> list[Path]:
-    """Create a clean top-five showcase with one weapon, name, and price per beat."""
+    """Create matching promo, skin-price, and promo-outro scenes."""
     data_dir.mkdir(parents=True, exist_ok=True)
     items = (copy.items or [copy.featured])[:5]
     art_paths: list[Path] = []
@@ -245,7 +245,7 @@ def make_scenes(copy: VideoCopy, currency: str, data_dir: Path,
         if not image_fetch or not _skin_image(item["name"], art, image_timeout):
             raise RuntimeError(f"Exact catalog artwork is unavailable for {item['name']}; refusing to publish an empty weapon showcase")
         art_paths.append(art)
-    phases = ["intro", *[f"item-{i}" for i in range(len(items))], "cta"]
+    phases = ["promo-intro", *[f"item-{i}" for i in range(len(items))], "promo-outro"]
     paths: list[Path] = []
 
     for index, phase in enumerate(phases):
@@ -257,14 +257,18 @@ def make_scenes(copy: VideoCopy, currency: str, data_dir: Path,
         draw.ellipse((54, 66, 70, 82), fill=LIME)
         _text(draw, "CS2 MARKET", (88, 72), 19, MUTED, True, anchor="lm")
 
-        if phase == "intro":
-            draw.rounded_rectangle((90, 184, 990, 258), radius=24,
-                                   fill=(5, 9, 15), outline=LIME, width=3)
-            _text(draw, PROMO_MESSAGE, (540, 221), 27, LIME, True, anchor="mm")
-            _draw_weapon(frame, art_path, (15, 300, 1065, 1250), .96)
-            headline, subline = _hook_overlay(copy, currency)
-            _text(draw, headline, (540, 1325), 75, WHITE, True, anchor="mm")
-            _text(draw, subline, (540, 1420), 25, LIME, True, anchor="mm")
+        if phase in {"promo-intro", "promo-outro"}:
+            _draw_weapon(frame, art_path, (70, 890, 1010, 1480), .86)
+            draw.rounded_rectangle((48, 250, 1032, 820), radius=40,
+                                   fill=(5, 9, 15), outline=LIME, width=6)
+            promo_title, promo_cta = PROMO_MESSAGE.split(", ", 1)
+            _text(draw, promo_title + ",", (540, 405), 76, LIME, True, anchor="mm")
+            _text(draw, promo_cta, (540, 525), 49, WHITE, True, anchor="mm")
+            draw.rounded_rectangle((142, 625, 938, 710), radius=24,
+                                   fill=(24, 35, 28), outline=LIME, width=2)
+            _text(draw, "clash.gg/r/CSSKINNS", (540, 668), 36, LIME, True, anchor="mm")
+            label = "START HERE" if phase == "promo-intro" else "CLAIM YOUR FREE SKIN"
+            _text(draw, label, (540, 765), 21, MUTED, True, anchor="mm")
         elif phase.startswith("item-"):
             item = items[current_index]
             _draw_weapon(frame, art_path, (15, 260, 1065, 1270), 1.12)
@@ -274,11 +278,6 @@ def make_scenes(copy: VideoCopy, currency: str, data_dir: Path,
                 _text(draw, line, (58, 1390 + line_no * 54), 41, WHITE, True)
             price_y = 1545 if len(name_lines) > 1 else 1505
             _text(draw, _money(item.get("price"), currency), (60, price_y), 67, LIME, True)
-        else:  # CTA
-            _draw_weapon(frame, art_paths[-1], (40, 270, 1040, 1130), .92)
-            _text(draw, "BUY  OR  WAIT?", (540, 1370), 61, WHITE, True, anchor="mm")
-            _text(draw, "WHICH SKIN IS YOUR PICK?", (540, 1470), 25, LIME, False, anchor="mm")
-
         path = data_dir / f"beat-{index + 1:02}.png"
         frame.save(path, optimize=True)
         paths.append(path)
@@ -368,15 +367,17 @@ def _pov_overlay(copy: VideoCopy, currency: str, phase: str, index: int,
     draw.ellipse((60, 73, 74, 87), fill=LIME)
     _text(draw, "CS2  /  MARKET", (90, 81), 20, WHITE, True, anchor="lm")
 
-    if phase == "hook":
-        draw.rounded_rectangle((44, 458, 900, 520), radius=20,
-                               fill=(5, 9, 15, 215), outline=LIME, width=3)
-        _text(draw, PROMO_MESSAGE, (472, 489), 25, LIME, True, anchor="mm")
-        headline, subline = _hook_overlay(copy, currency)
-        draw.rounded_rectangle((44, 136, 880, 438), radius=28, fill=(4, 8, 13, 155))
-        _text(draw, headline, (76, 178), 84 if len(headline) < 12 else 68, LIME, True)
-        _text(draw, subline, (80, 282), 28, WHITE, True)
-        _text(draw, "HERE'S THE SKIN BEHIND THE MOVE", (80, 345), 22, MUTED, False)
+    if phase in {"promo-intro", "promo-outro"}:
+        draw.rounded_rectangle((42, 430, 1038, 1030), radius=40,
+                               fill=(5, 9, 15, 238), outline=(*LIME, 255), width=6)
+        promo_title, promo_cta = PROMO_MESSAGE.split(", ", 1)
+        _text(draw, promo_title + ",", (540, 600), 76, LIME, True, anchor="mm")
+        _text(draw, promo_cta, (540, 730), 48, WHITE, True, anchor="mm")
+        draw.rounded_rectangle((142, 820, 938, 905), radius=24,
+                               fill=(24, 35, 28, 245), outline=(*LIME, 255), width=2)
+        _text(draw, "clash.gg/r/CSSKINNS", (540, 863), 36, LIME, True, anchor="mm")
+        label = "START HERE" if phase == "promo-intro" else "CLAIM YOUR FREE SKIN"
+        _text(draw, label, (540, 967), 21, MUTED, True, anchor="mm")
     elif phase == "item":
         item = (copy.items or [copy.featured])[index]
         draw.rounded_rectangle((44, 136, 850, 410), radius=28, fill=(4, 8, 13, 155))
@@ -402,20 +403,21 @@ def _base_skin_name(name: str) -> str:
 
 def _render_pov_video(ffmpeg: str, ffprobe: str, copy: VideoCopy, currency: str,
                       data_dir: Path, output_path: Path, audio: Path, duration: float,
-                      clip_paths: list[Path]) -> float:
+                      clip_paths: list[Path], scene_durations: list[float]) -> float:
     """Cut captured Skinshotter POV clips together with restrained overlays and audio."""
     items = (copy.items or [copy.featured])[:5]
     if len(clip_paths) != len(items) or not clip_paths:
         raise RuntimeError("POV renderer did not return one clip for each selected skin")
     segment_count = len(items) + 2
-    segment_duration = duration / segment_count
+    if len(scene_durations) != segment_count or abs(sum(scene_durations) - duration) > .05:
+        raise RuntimeError("Narration segments do not align with POV scene timing")
     overlays: list[Path] = []
     for scene_index in range(segment_count):
         if scene_index == 0:
-            phase, item_index = "hook", 0
+            phase, item_index = "promo-intro", 0
             clip = clip_paths[0]
         elif scene_index == segment_count - 1:
-            phase, item_index = "cta", len(items) - 1
+            phase, item_index = "promo-outro", len(items) - 1
             clip = clip_paths[-1]
         else:
             phase, item_index = "item", scene_index - 1
@@ -428,8 +430,8 @@ def _render_pov_video(ffmpeg: str, ffprobe: str, copy: VideoCopy, currency: str,
     for scene_index in range(segment_count):
         clip = clip_paths[0] if scene_index == 0 else clip_paths[-1] if scene_index == segment_count - 1 else clip_paths[scene_index - 1]
         command.extend(["-stream_loop", "-1", "-i", str(clip)])
-    for overlay in overlays:
-        command.extend(["-loop", "1", "-framerate", "30", "-t", f"{segment_duration:.4f}", "-i", str(overlay)])
+    for scene_index, overlay in enumerate(overlays):
+        command.extend(["-loop", "1", "-framerate", "30", "-t", f"{scene_durations[scene_index]:.4f}", "-i", str(overlay)])
     audio_input = segment_count * 2
     command.extend(["-i", str(audio)])
     music_args, music_filter = _music_input(ffmpeg, duration, data_dir)
@@ -440,11 +442,11 @@ def _render_pov_video(ffmpeg: str, ffprobe: str, copy: VideoCopy, currency: str,
     for index in range(segment_count):
         filters.append(
             f"[{index}:v]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},"
-            f"fps=30,trim=duration={segment_duration:.4f},setpts=PTS-STARTPTS,setsar=1[base{index}]"
+            f"fps=30,trim=duration={scene_durations[index]:.4f},setpts=PTS-STARTPTS,setsar=1[base{index}]"
         )
         overlay_input = segment_count + index
         filters.append(
-            f"[{overlay_input}:v]format=rgba,trim=duration={segment_duration:.4f},"
+            f"[{overlay_input}:v]format=rgba,trim=duration={scene_durations[index]:.4f},"
             f"setpts=PTS-STARTPTS[overlay{index}]"
         )
         filters.append(f"[base{index}][overlay{index}]overlay=0:0:shortest=1[v{index}]")
@@ -482,6 +484,70 @@ def _render_pov_video(ffmpeg: str, ffprobe: str, copy: VideoCopy, currency: str,
     return final_duration
 
 
+def _voiceover_lines(copy: VideoCopy, currency: str) -> list[str]:
+    """Build one spoken beat for each matching promo or skin-price scene."""
+    items = (copy.items or [copy.featured])[:5]
+    lines = ["Get a ten dollar free skin. The link is in the description."]
+    numbers = ("One", "Two", "Three", "Four", "Five")
+    for index, item in enumerate(items):
+        name = _spoken_name(item["name"])
+        price = _money(item.get("price"), currency)
+        lines.append(f"Number {numbers[index]}. {name}. Lowest listing: {price}.")
+    lines.append("Claim your ten dollar free skin. Use the link in the description.")
+    return lines
+
+
+def _synthesize_aligned_voiceover(ffmpeg: str, ffprobe: str, copy: VideoCopy,
+                                  currency: str, data_dir: Path, voice: str
+                                  ) -> tuple[Path, list[float]]:
+    """Synthesize each visual beat separately, then pad it to its scene duration."""
+    lines = _voiceover_lines(copy, currency)
+    paths: list[Path] = []
+    speech_durations: list[float] = []
+    for index, line in enumerate(lines):
+        part = data_dir / f"voice-part-{index + 1:02d}.mp3"
+        asyncio.run(_synthesize(line, voice, part))
+        result = subprocess.run(
+            [ffprobe, "-v", "error", "-show_entries", "format=duration", "-of",
+             "default=noprint_wrappers=1:nokey=1", str(part)],
+            check=True, capture_output=True, text=True,
+        )
+        speech_duration = float(result.stdout.strip())
+        if speech_duration <= 0:
+            raise RuntimeError(f"Speech synthesis generated empty audio for beat {index + 1}")
+        paths.append(part)
+        speech_durations.append(speech_duration)
+
+    # Intro and outro stay visible long enough to read. Each price card remains
+    # on screen until its own spoken skin name and listing price have finished.
+    scene_durations = [max(speech_durations[0] + .45, 2.8)]
+    scene_durations.extend(max(value + .45, 3.2) for value in speech_durations[1:-1])
+    scene_durations.append(max(speech_durations[-1] + .45, 3.5))
+    if sum(scene_durations) < 12:
+        scene_durations[-1] += 12 - sum(scene_durations)
+    duration = sum(scene_durations)
+    if duration > 45:
+        raise RuntimeError(f"Skin-price narration exceeds the 45-second Short limit: {duration:.2f}s")
+
+    command = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error"]
+    for path in paths:
+        command.extend(["-i", str(path)])
+    filters: list[str] = []
+    for index, (speech_duration, scene_duration) in enumerate(zip(speech_durations, scene_durations)):
+        pad = max(0.01, scene_duration - speech_duration)
+        filters.append(
+            f"[{index}:a]aresample=44100,apad=pad_dur={pad:.4f},"
+            f"atrim=duration={scene_duration:.4f}[beat{index}]"
+        )
+    concat_inputs = "".join(f"[beat{index}]" for index in range(len(paths)))
+    filters.append(f"{concat_inputs}concat=n={len(paths)}:v=0:a=1[voice]")
+    voice_path = data_dir / "voice-aligned.wav"
+    command.extend(["-filter_complex", ";".join(filters), "-map", "[voice]",
+                    "-c:a", "pcm_s16le", "-ar", "44100", str(voice_path)])
+    subprocess.run(command, check=True, capture_output=True, text=True)
+    return voice_path, scene_durations
+
+
 def render_video(copy: VideoCopy, currency: str, data_dir: Path, output_path: Path,
                  voice: str, image_fetch: bool = True, image_timeout: int = 8,
                  skinshotter_enabled: bool = False, skinshotter_clip_seconds: float = 5.0,
@@ -491,15 +557,10 @@ def render_video(copy: VideoCopy, currency: str, data_dir: Path, output_path: Pa
     output_path.parent.mkdir(parents=True, exist_ok=True)
     status_path = data_dir / "renderer-status.json"
     status_path.write_text(json.dumps({"renderer": "static catalog art"}, indent=2), encoding="utf-8")
-    audio = asyncio.run(_synthesize(copy.narration, voice, data_dir / "voice.mp3"))
-    probe = subprocess.run([ffprobe, "-v", "error", "-show_entries", "format=duration", "-of",
-                            "default=noprint_wrappers=1:nokey=1", str(audio)],
-                           check=True, capture_output=True, text=True)
-    speech_duration = float(probe.stdout.strip())
-    if speech_duration <= 0:
-        raise RuntimeError("Speech synthesis generated empty audio")
-    item_count = len(copy.items or [copy.featured])
-    duration = max(speech_duration, 12.0, 3.4 + item_count * 2.2)
+    audio, scene_durations = _synthesize_aligned_voiceover(
+        ffmpeg, ffprobe, copy, currency, data_dir, voice,
+    )
+    duration = sum(scene_durations)
     if skinshotter_enabled:
         # Keep capture inside the Actions job: no game server or manual recording.
         # Import lazily so local static renders and test environments do not need Chromium.
@@ -510,7 +571,7 @@ def render_video(copy: VideoCopy, currency: str, data_dir: Path, output_path: Pa
             clips = capture_skin_clips((copy.items or [copy.featured])[:5], catalog,
                                        data_dir / "skinshotter", skinshotter_clip_seconds)
             final_duration = _render_pov_video(ffmpeg, ffprobe, copy, currency, data_dir, output_path,
-                                               audio, duration, clips)
+                                               audio, duration, clips, scene_durations)
             status_path.write_text(json.dumps({
                 "renderer": "Skinshotter POV", "clips": len(clips),
             }, indent=2), encoding="utf-8")
@@ -530,9 +591,10 @@ def render_video(copy: VideoCopy, currency: str, data_dir: Path, output_path: Pa
                 "error": f"{type(exc).__name__}: {exc}",
             }, indent=2), encoding="utf-8")
     scenes = make_scenes(copy, currency, data_dir, image_fetch, image_timeout)
-    scene_duration = duration / len(scenes)
+    if len(scenes) != len(scene_durations):
+        raise RuntimeError("Narration beats and rendered scenes have different counts")
     command = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error"]
-    for scene in scenes:
+    for scene, scene_duration in zip(scenes, scene_durations):
         command.extend(["-loop", "1", "-framerate", "30", "-t", f"{scene_duration:.4f}", "-i", str(scene)])
     audio_input = len(scenes)
     command.extend(["-i", str(audio)])
@@ -545,7 +607,7 @@ def render_video(copy: VideoCopy, currency: str, data_dir: Path, output_path: Pa
         filters.append(
             f"[{index}:v]zoompan=z='min(zoom+0.00028,1.04)':"
             f"x='iw/2-(iw/zoom/2){direction}2*sin(on/28)':y='ih/2-(ih/zoom/2)':"
-            f"d=1:s=1080x1920:fps=30,trim=duration={scene_duration:.4f},"
+            f"d=1:s=1080x1920:fps=30,trim=duration={scene_durations[index]:.4f},"
             f"setpts=PTS-STARTPTS,setsar=1[v{index}]"
         )
     concat_inputs = "".join(f"[v{i}]" for i in range(len(scenes)))

@@ -77,3 +77,20 @@ def test_cold_open_price_gap_matches_the_voiceover_metric():
     headline, detail = media._hook_overlay(copy, "EUR")
     assert headline == "3.6%"
     assert detail == "ASK ABOVE RECENT SALES"
+
+
+def test_market_voiceover_has_a_matching_line_for_every_skin_and_promo_bookends():
+    rows = [
+        {"name": f"AK-47 | Skin {number} (Field-Tested)", "price": number + 1.5}
+        for number in range(3)
+    ]
+    copy = build_copy("budget", rows, "EUR")
+
+    lines = media._voiceover_lines(copy, "EUR")
+
+    assert len(lines) == 5
+    assert lines[0] == "Get a ten dollar free skin. The link is in the description."
+    assert "Number One. AK forty-seven Skin 0." in lines[1]
+    assert "€1.50" in lines[1]
+    assert "Number Three. AK forty-seven Skin 2." in lines[3]
+    assert "Claim your ten dollar free skin." in lines[-1]
