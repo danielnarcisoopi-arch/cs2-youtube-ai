@@ -90,12 +90,40 @@ def test_clip_copy_includes_promo_link_and_source_attribution():
     assert "7656119" in copy.description
 
 
+def test_clip_copy_uses_metadata_title_or_neutral_clip_number():
+    titled = clips.build_clip_copy(
+        clips.DatasetClip("videos/clip_9.mp4", "clip_9", "Clean 4K", "", 120), "owner/dataset"
+    )
+    untitled = clips.build_clip_copy(
+        clips.DatasetClip("videos/clip_10.mp4", "clip_10", "", "", 120), "owner/dataset"
+    )
+
+    assert titled.featured["name"] == "Clean 4K"
+    assert untitled.featured["name"] == "Highlight #10"
+
+
+def test_title_overlay_uses_the_top_band_and_promo_is_three_seconds():
+    first = clips._draw_clip_overlay("Clean 4K").crop((50, 70, 1030, 190))
+    second = clips._draw_clip_overlay("Ace on Mirage").crop((50, 70, 1030, 190))
+
+    assert first.tobytes() != second.tobytes()
+    assert clips.INTRO_SECONDS == 3.0
+    assert clips.PROMO_SECONDS == 3.0
+    assert clips.MIN_CLIP_SECONDS == 12.0 - clips.INTRO_SECONDS - clips.PROMO_SECONDS
+
+
 def test_intro_and_outro_promo_cards_are_vertical_and_high_contrast():
-    intro = clips._draw_promo_card("intro")
+    intro3 = clips._draw_promo_card("intro", title="A clean 4K", countdown=3)
+    intro3_other_title = clips._draw_promo_card("intro", title="Mirage ace", countdown=3)
+    intro2 = clips._draw_promo_card("intro", title="A clean 4K", countdown=2)
+    intro1 = clips._draw_promo_card("intro", title="A clean 4K", countdown=1)
     outro = clips._draw_promo_card("outro")
 
-    assert intro.size == (1080, 1920)
+    assert intro3.size == (1080, 1920)
     assert outro.size == (1080, 1920)
-    assert intro.getpixel((540, 800)) == (5, 9, 15)
+    assert intro3.getpixel((540, 800)) == (5, 9, 15)
     assert outro.getpixel((540, 800)) == (5, 9, 15)
-    assert intro.tobytes() != outro.tobytes()
+    assert intro3.crop((0, 180, 1080, 330)).tobytes() != intro3_other_title.crop((0, 180, 1080, 330)).tobytes()
+    assert intro3.tobytes() != intro2.tobytes()
+    assert intro2.tobytes() != intro1.tobytes()
+    assert intro3.tobytes() != outro.tobytes()
