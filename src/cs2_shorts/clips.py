@@ -54,7 +54,7 @@ def _http_json(url: str, params: dict[str, Any], timeout: int = 40) -> dict[str,
     return result
 
 
-def _dataset_split(dataset_id: str) -> tuple[str, str, int]:
+def _dataset_split(dataset_id: str) -> tuple[str, str]:
     data = _http_json(f"{DATASET_API}/splits", {"dataset": dataset_id})
     splits = data.get("splits") or []
     candidates = [row for row in splits if row.get("config") == "metadata"] or splits
@@ -62,10 +62,9 @@ def _dataset_split(dataset_id: str) -> tuple[str, str, int]:
     split = split or (candidates[0] if candidates else None)
     if not split:
         raise RuntimeError(f"No readable metadata split found for dataset {dataset_id}")
-    count = int(split.get("num_examples") or 0)
-    if count < 1:
-        raise RuntimeError(f"Dataset metadata split has no rows: {dataset_id}")
-    return str(split.get("config", "metadata")), str(split["split"]), count
+    # The /splits endpoint only lists config and split names. Row counts are
+    # provided by /rows as num_rows_total, so discover that separately.
+    return str(split.get("config", "metadata")), str(split["split"])
 
 
 def _candidate(row: dict[str, Any]) -> DatasetClip | None:
@@ -96,7 +95,19 @@ def _candidate(row: dict[str, Any]) -> DatasetClip | None:
 def select_dataset_clip(dataset_id: str, recent: set[str],
                         rng: random.Random | Any = random) -> DatasetClip:
     """Pick a recent, unseen video row without downloading the full dataset."""
-    config, split, count = _dataset_split(dataset_id)
+    config, split = _dataset_split(dataset_id)
+    first_page = _http_json(f"{DATASET_API}/rows", {
+        "dataset": dataset_id, "config": config, "split": split,
+        "offset": 0, "length": 1,
+    })
+    try:
+        count = int(first_page.get("num_rows_total") or 0)
+    except (TypeError, ValueError):
+        count = 0
+    if count < 1:
+        raise RuntimeError(
+            f"Could not read the row count for dataset split {dataset_id}/{config}/{split}"
+        )
     length = min(100, count)
     for _ in range(24):
         offset = rng.randrange(count)
@@ -201,7 +212,7 @@ def _draw_clip_overlay() -> Image.Image:
                            fill=(5, 9, 15, 205), outline=(*ACCENT, 230), width=2)
     _text(draw, "CS2 COMMUNITY HIGHLIGHT", (82, 114), 26, WHITE, True, anchor="lm")
     draw.rounded_rectangle((140, 1700, 940, 1780), radius=22, fill=(5, 9, 15, 190))
-    _text(draw, "WATCH THE PLAY  ·  CS2", (540, 1740), 23, WHITE, True, anchor="mm")
+    _text(draw, "WATCH THE PLAY  Â·  CS2", (540, 1740), 23, WHITE, True, anchor="mm")
     return overlay
 
 
