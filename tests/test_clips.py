@@ -18,13 +18,20 @@ def test_dataset_candidate_accepts_video_and_rejects_preview_or_traversal():
 
 
 def test_select_dataset_clip_avoids_recently_used_paths(monkeypatch):
-    monkeypatch.setattr(clips, "_dataset_split", lambda _dataset: ("metadata", "metadata", 2))
-    monkeypatch.setattr(clips, "_http_json", lambda *_args, **_kwargs: {
-        "rows": [
-            {"row": {"file": "videos/clip_1.mp4", "title": "Old clip"}},
-            {"row": {"file": "videos/clip_2.mp4", "title": "New clip"}},
-        ],
-    })
+    monkeypatch.setattr(clips, "_dataset_split", lambda _dataset: ("metadata", "metadata"))
+
+    def fake_http_json(_url, params, **_kwargs):
+        if params["length"] == 1:
+            return {"num_rows_total": 2, "rows": []}
+        return {
+            "num_rows_total": 2,
+            "rows": [
+                {"row": {"file": "videos/clip_1.mp4", "title": "Old clip"}},
+                {"row": {"file": "videos/clip_2.mp4", "title": "New clip"}},
+            ],
+        }
+
+    monkeypatch.setattr(clips, "_http_json", fake_http_json)
 
     selected = clips.select_dataset_clip("owner/dataset", {"videos/clip_1.mp4"}, random.Random(4))
 

@@ -95,15 +95,23 @@ def _candidate(row: dict[str, Any]) -> DatasetClip | None:
 def select_dataset_clip(dataset_id: str, recent: set[str],
                         rng: random.Random | Any = random) -> DatasetClip:
     """Pick a recent, unseen video row without downloading the full dataset."""
-    config, split = _dataset_split(dataset_id)
-    first_page = _http_json(f"{DATASET_API}/rows", {
-        "dataset": dataset_id, "config": config, "split": split,
-        "offset": 0, "length": 1,
-    })
+    split_info = _dataset_split(dataset_id)
+    config, split = split_info[:2]
+    # Older callers/tests may still provide a row count with the split tuple.
+    # The live /splits endpoint does not, so production obtains it from /rows.
     try:
-        count = int(first_page.get("num_rows_total") or 0)
+        count = int(split_info[2]) if len(split_info) > 2 else 0
     except (TypeError, ValueError):
         count = 0
+    if count < 1:
+        first_page = _http_json(f"{DATASET_API}/rows", {
+            "dataset": dataset_id, "config": config, "split": split,
+            "offset": 0, "length": 1,
+        })
+        try:
+            count = int(first_page.get("num_rows_total") or 0)
+        except (TypeError, ValueError):
+            count = 0
     if count < 1:
         raise RuntimeError(
             f"Could not read the row count for dataset split {dataset_id}/{config}/{split}"
