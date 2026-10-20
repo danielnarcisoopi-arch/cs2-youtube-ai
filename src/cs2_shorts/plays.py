@@ -24,7 +24,7 @@ from .tactics import (
     BG, GOLD, H, MUTED, W, WHITE, _background, _load_callouts, _load_radar,
     _resolve_callout, _text, _wrap,
 )
-from .promotion import PROMO_MESSAGE, add_promo_link
+from .promotion import PROMO_MESSAGE, PROMO_URL, add_promo_link
 
 log = logging.getLogger(__name__)
 FPS = 6
@@ -126,10 +126,27 @@ def _route_point(start: tuple[float, float], end: tuple[float, float], t: float,
     return min(0.965, max(0.035, x)), min(0.965, max(0.035, y))
 
 
+def _draw_promo_panel(image: Image.Image, phase: str) -> None:
+    """Draw the prominent conversion card used in the market Shorts."""
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle((48, 250, 1032, 820), radius=40,
+                           fill=(5, 9, 15), outline=ATTACK, width=6)
+    promo_title, promo_cta = PROMO_MESSAGE.split(", ", 1)
+    _text(draw, promo_title + ",", (540, 405), 76, ATTACK, True, anchor="mm")
+    _text(draw, promo_cta, (540, 525), 49, WHITE, True, anchor="mm")
+    draw.rounded_rectangle((142, 625, 938, 710), radius=24,
+                           fill=(24, 35, 28), outline=ATTACK, width=2)
+    _text(draw, PROMO_URL.removeprefix("http://"), (540, 668), 36, ATTACK, True, anchor="mm")
+    label = "START HERE" if phase == "intro" else "CLAIM YOUR FREE SKIN"
+    _text(draw, label, (540, 765), 21, MUTED, True, anchor="mm")
+
+
 def _draw_play_frame(play: PlayScenario, episode: int, frame: int,
                      radar: Image.Image, callouts: dict[str, tuple[float, float]],
                      duration: float = SIM_SECONDS) -> Image.Image:
     elapsed = frame / FPS
+    promo_intro = elapsed < 3.4
+    promo_outro = elapsed >= duration - 3.4
     image = _background()
     draw = ImageDraw.Draw(image)
     flash_at = duration * 0.48
@@ -144,13 +161,10 @@ def _draw_play_frame(play: PlayScenario, episode: int, frame: int,
     draw.rounded_rectangle((64, 62, 1016, 146), 22, fill=(17, 31, 43), outline=(46, 70, 84), width=2)
     _text(draw, "CS2  /  PLAYBOOK", (92, 104), 22, WHITE, True, anchor="lm")
     _text(draw, f"SIM {episode:02d}", (985, 104), 18, MUTED, True, anchor="rm")
-    hook = play.hook if elapsed < 3.4 else play.title
-    for i, line in enumerate(_wrap(hook, 31)):
-        _text(draw, line, (66, 190 + i * 59), 46 if len(_wrap(hook, 31)) <= 2 else 39, WHITE, True)
-
-    if elapsed < 3.4:
-        draw.rounded_rectangle((94, 320, 986, 370), 18, fill=(8, 18, 27), outline=ATTACK, width=2)
-        _text(draw, PROMO_MESSAGE, (540, 345), 22, ATTACK, True, anchor="mm")
+    if not (promo_intro or promo_outro):
+        hook = play.hook if elapsed < 3.4 else play.title
+        for i, line in enumerate(_wrap(hook, 31)):
+            _text(draw, line, (66, 190 + i * 59), 46 if len(_wrap(hook, 31)) <= 2 else 39, WHITE, True)
 
     draw.rounded_rectangle((64, 370, 1016, 430), 18, fill=(14, 26, 37), outline=(49, 69, 82), width=2)
     _text(draw, f"{play.map_name}  ·  {play.side} SITE EXECUTE", (88, 400), 19, WHITE, True, anchor="lm")
@@ -237,6 +251,10 @@ def _draw_play_frame(play: PlayScenario, episode: int, frame: int,
     _text(draw, "T  ATTACKERS", (68, 1746), 17, ATTACK, True)
     _text(draw, "CT  DEFENDERS", (1012, 1746), 17, DEFEND, True, anchor="ra")
     _text(draw, "ILLUSTRATIVE SIMULATION  ·  NOT DEMO FOOTAGE", (540, 1834), 16, MUTED, True, anchor="mm")
+    if promo_intro:
+        _draw_promo_panel(image, "intro")
+    elif promo_outro:
+        _draw_promo_panel(image, "outro")
     return image
 
 

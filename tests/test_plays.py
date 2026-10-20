@@ -43,8 +43,13 @@ def test_five_v_five_play_frame_uses_real_radar_backdrop_and_moves_over_time():
     }
     early = _draw_play_frame(play, 1, 8, radar, callouts)
     later = _draw_play_frame(play, 1, 60, radar, callouts)
+    intro = _draw_play_frame(play, 1, 0, radar, callouts, duration=17)
+    outro = _draw_play_frame(play, 1, 99, radar, callouts, duration=17)
     assert early.size == (1080, 1920)
     assert early.tobytes() != later.tobytes()
+    assert intro.getpixel((540, 550)) == (5, 9, 15)
+    assert outro.getpixel((540, 550)) == (5, 9, 15)
+    assert later.getpixel((540, 550)) != (5, 9, 15)
 
 
 def test_anubis_b_split_uses_published_callouts_instead_of_missing_b_main():
