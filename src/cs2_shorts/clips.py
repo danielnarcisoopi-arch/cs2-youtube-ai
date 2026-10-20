@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import logging
 import math
@@ -17,6 +18,7 @@ from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 import requests
+import zstandard
 from PIL import Image, ImageDraw
 
 from .config import settings
@@ -42,6 +44,9 @@ class DatasetClip:
     title: str
     steam_id: str
     fps: int
+
+
+_DATASET_METADATA_CACHE: dict[str, tuple[DatasetClip, ...]] = {}
 
 
 def _http_json(url: str, params: dict[str, Any], timeout: int = 40) -> dict[str, Any]:
@@ -92,6 +97,52 @@ def _candidate(row: dict[str, Any]) -> DatasetClip | None:
     return DatasetClip(path, clip_id, title, steam_id, fps)
 
 
+def _load_dataset_metadata(dataset_id: str) -> tuple[DatasetClip, ...]:
+    """Read the small compressed metadata file when the Dataset Viewer is unavailable."""
+    cached = _DATASET_METADATA_CACHE.get(dataset_id)
+    if cached is not None:
+        return cached
+
+    url = f"{HUB_RESOLVE}/{dataset_id}/resolve/main/dataset.jsonl.zst?download=true"
+    response = requests.get(url, timeout=(20, 90), allow_redirects=True,
+                            headers={"User-Agent": "cs2-youtube-ai/1.0"})
+    response.raise_for_status()
+    if len(response.content) > 5 * 1024 * 1024:
+        raise RuntimeError("Dataset metadata file exceeded the 5 MiB safety limit")
+
+    with zstandard.ZstdDecompressor().stream_reader(io.BytesIO(response.content)) as reader:
+        decoded = reader.read(16 * 1024 * 1024 + 1)
+    if len(decoded) > 16 * 1024 * 1024:
+        raise RuntimeError("Decompressed dataset metadata exceeded the 16 MiB safety limit")
+
+    clips: list[DatasetClip] = []
+    for line_number, line in enumerate(decoded.decode("utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"Invalid JSON in dataset metadata at line {line_number}") from exc
+        if isinstance(row, dict):
+            clip = _candidate(row)
+            if clip:
+                clips.append(clip)
+    if not clips:
+        raise RuntimeError(f"No playable video paths found in {dataset_id}/dataset.jsonl.zst")
+
+    result = tuple(clips)
+    _DATASET_METADATA_CACHE[dataset_id] = result
+    return result
+
+
+def _select_from_source_metadata(dataset_id: str, recent: set[str],
+                                 rng: random.Random | Any) -> DatasetClip:
+    candidates = [clip for clip in _load_dataset_metadata(dataset_id) if clip.path not in recent]
+    if not candidates:
+        raise RuntimeError(f"No unseen video clips remain in dataset {dataset_id}")
+    return rng.choice(candidates)
+
+
 def select_dataset_clip(dataset_id: str, recent: set[str],
                         rng: random.Random | Any = random) -> DatasetClip:
     """Pick a recent, unseen video row without downloading the full dataset."""
@@ -104,27 +155,34 @@ def select_dataset_clip(dataset_id: str, recent: set[str],
     except (TypeError, ValueError):
         count = 0
     if count < 1:
-        first_page = _http_json(f"{DATASET_API}/rows", {
-            "dataset": dataset_id, "config": config, "split": split,
-            "offset": 0, "length": 1,
-        })
+        try:
+            first_page = _http_json(f"{DATASET_API}/rows", {
+                "dataset": dataset_id, "config": config, "split": split,
+                "offset": 0, "length": 1,
+            })
+        except requests.RequestException as exc:
+            log.warning("Dataset Viewer rows endpoint failed; using the source metadata file: %s", exc)
+            return _select_from_source_metadata(dataset_id, recent, rng)
         try:
             count = int(first_page.get("num_rows_total") or 0)
         except (TypeError, ValueError):
             count = 0
     if count < 1:
-        raise RuntimeError(
-            f"Could not read the row count for dataset split {dataset_id}/{config}/{split}"
-        )
+        log.warning("Dataset Viewer omitted row count; using the source metadata file")
+        return _select_from_source_metadata(dataset_id, recent, rng)
     length = min(100, count)
     for _ in range(24):
         offset = rng.randrange(count)
         # Hugging Face's rows API returns up to 100 rows per request.
         offset = (offset // length) * length
-        data = _http_json(f"{DATASET_API}/rows", {
-            "dataset": dataset_id, "config": config, "split": split,
-            "offset": offset, "length": length,
-        })
+        try:
+            data = _http_json(f"{DATASET_API}/rows", {
+                "dataset": dataset_id, "config": config, "split": split,
+                "offset": offset, "length": length,
+            })
+        except requests.RequestException as exc:
+            log.warning("Dataset Viewer rows endpoint failed; using the source metadata file: %s", exc)
+            return _select_from_source_metadata(dataset_id, recent, rng)
         rows = data.get("rows") or []
         candidates = []
         for wrapped in rows:
@@ -134,7 +192,8 @@ def select_dataset_clip(dataset_id: str, recent: set[str],
                 candidates.append(candidate)
         if candidates:
             return rng.choice(candidates)
-    raise RuntimeError("Could not find an unseen MP4/WebM clip in the dataset after 24 samples")
+    log.warning("Dataset Viewer returned no unseen clip; using the source metadata file")
+    return _select_from_source_metadata(dataset_id, recent, rng)
 
 
 def download_dataset_clip(dataset_id: str, clip: DatasetClip, destination: Path,

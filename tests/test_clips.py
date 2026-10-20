@@ -39,6 +39,46 @@ def test_select_dataset_clip_avoids_recently_used_paths(monkeypatch):
     assert selected.title == "New clip"
 
 
+def test_select_dataset_clip_falls_back_when_dataset_viewer_returns_500(monkeypatch):
+    import requests
+
+    monkeypatch.setattr(clips, "_dataset_split", lambda _dataset: ("metadata", "metadata"))
+
+    def viewer_error(*_args, **_kwargs):
+        raise requests.HTTPError("500 Server Error")
+
+    fallback = clips.DatasetClip("videos/clip_2.webm", "clip_2", "Fallback clip", "", 120)
+    monkeypatch.setattr(clips, "_http_json", viewer_error)
+    monkeypatch.setattr(clips, "_load_dataset_metadata", lambda _dataset: (fallback,))
+
+    selected = clips.select_dataset_clip("owner/dataset", set(), random.Random(4))
+
+    assert selected == fallback
+
+
+def test_source_metadata_fallback_decodes_compressed_jsonl(monkeypatch):
+    dataset_id = "owner/compressed-dataset"
+    payload = clips.zstandard.ZstdCompressor().compress(
+        b'{"file":"videos/clip_7.webm","title":"Compressed metadata","fps":120}\n'
+    )
+
+    class FakeResponse:
+        content = payload
+
+        @staticmethod
+        def raise_for_status():
+            pass
+
+    monkeypatch.delitem(clips._DATASET_METADATA_CACHE, dataset_id, raising=False)
+    monkeypatch.setattr(clips.requests, "get", lambda *_args, **_kwargs: FakeResponse())
+
+    result = clips._load_dataset_metadata(dataset_id)
+
+    assert len(result) == 1
+    assert result[0].path == "videos/clip_7.webm"
+    assert result[0].title == "Compressed metadata"
+
+
 def test_clip_copy_includes_promo_link_and_source_attribution():
     clip = clips.DatasetClip("videos/clip_9.mp4", "clip_9", "A clean 4K", "7656119", 120)
 
