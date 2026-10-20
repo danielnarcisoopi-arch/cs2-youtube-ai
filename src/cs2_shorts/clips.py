@@ -29,9 +29,10 @@ from .youtube import upload_video
 
 log = logging.getLogger(__name__)
 WIDTH, HEIGHT = 1080, 1920
-PROMO_SECONDS = 3.4
+INTRO_SECONDS = 3.0
+PROMO_SECONDS = 3.0
+MIN_CLIP_SECONDS = 12.0 - INTRO_SECONDS - PROMO_SECONDS
 MAX_CLIP_SECONDS = 28.0
-MIN_CLIP_SECONDS = 12.0 - 2 * PROMO_SECONDS
 DATASET_API = "https://datasets-server.huggingface.co"
 HUB_RESOLVE = "https://huggingface.co/datasets"
 ACCENT = (77, 215, 234)
@@ -228,7 +229,8 @@ def download_dataset_clip(dataset_id: str, clip: DatasetClip, destination: Path,
 
 
 def build_clip_copy(clip: DatasetClip, dataset_id: str) -> VideoCopy:
-    raw_title = clip.title or f"Community clip {clip.clip_id}"
+    clip_number = clip.clip_id.removeprefix("clip_")
+    raw_title = clip.title or f"Highlight #{clip_number}"
     clean_title = re.sub(r"[\r\n]+", " ", raw_title).strip()
     title = ("CS2 Highlight: " + clean_title)[:100]
     source_line = f"Source clip: {dataset_id} / {clip.path}"
@@ -245,7 +247,7 @@ def build_clip_copy(clip: DatasetClip, dataset_id: str) -> VideoCopy:
                      "community_clip", {"name": clean_title})
 
 
-def _draw_promo_card(phase: str) -> Image.Image:
+def _draw_promo_card(phase: str, title: str = "", countdown: int = 3) -> Image.Image:
     image = Image.new("RGB", (WIDTH, HEIGHT), BG)
     top = (7, 15, 25)
     bottom = (10, 31, 43)
@@ -258,26 +260,48 @@ def _draw_promo_card(phase: str) -> Image.Image:
     draw.rounded_rectangle((64, 76, 1016, 154), radius=24,
                            fill=(17, 31, 43), outline=(46, 70, 84), width=2)
     _text(draw, "CS2  /  COMMUNITY HIGHLIGHTS", (540, 115), 25, WHITE, True, anchor="mm")
-    draw.rounded_rectangle((48, 430, 1032, 1195), radius=42,
-                           fill=(5, 9, 15), outline=ACCENT, width=7)
     promo_title, promo_cta = PROMO_MESSAGE.split(", ", 1)
-    _text(draw, promo_title + ",", (540, 630), 76, ACCENT, True, anchor="mm")
-    _text(draw, promo_cta, (540, 755), 49, WHITE, True, anchor="mm")
-    draw.rounded_rectangle((142, 875, 938, 975), radius=26,
+    if phase == "intro":
+        clean_title = re.sub(r"\s+", " ", title).strip() or "CS2 COMMUNITY HIGHLIGHT"
+        title_lines = _wrap(clean_title[:110], max_chars=36)
+        font_size = 42 if len(title_lines) == 1 else 36
+        start_y = 245 - (len(title_lines) - 1) * 22
+        for index, line in enumerate(title_lines):
+            _text(draw, line, (540, start_y + index * 48), font_size,
+                  WHITE if index == 0 else ACCENT, True, anchor="mm")
+        _text(draw, "STARTING IN", (540, 440), 28, MUTED, True, anchor="mm")
+        _text(draw, str(max(1, min(3, countdown))), (540, 580), 126, ACCENT, True, anchor="mm")
+        panel = (48, 730, 1032, 1410)
+        title_y, cta_y, url_y, label_y, link_y = 865, 980, 1125, 1250, 1345
+    else:
+        panel = (48, 430, 1032, 1195)
+        title_y, cta_y, url_y, label_y, link_y = 630, 755, 925, 1080, 1325
+    draw.rounded_rectangle(panel, radius=42, fill=(5, 9, 15), outline=ACCENT, width=7)
+    _text(draw, promo_title + ",", (540, title_y), 76, ACCENT, True, anchor="mm")
+    _text(draw, promo_cta, (540, cta_y), 49, WHITE, True, anchor="mm")
+    draw.rounded_rectangle((142, url_y - 50, 938, url_y + 50), radius=26,
                            fill=(24, 35, 28), outline=ACCENT, width=3)
-    _text(draw, PROMO_URL.removeprefix("http://"), (540, 925), 36, ACCENT, True, anchor="mm")
-    label = "START HERE" if phase == "intro" else "CLAIM YOUR FREE SKIN"
-    _text(draw, label, (540, 1080), 24, MUTED, True, anchor="mm")
-    _text(draw, "LINK IN DESCRIPTION", (540, 1325), 27, WHITE, True, anchor="mm")
+    _text(draw, PROMO_URL.removeprefix("http://"), (540, url_y), 36, ACCENT, True, anchor="mm")
+    label = "COUNTDOWN" if phase == "intro" else "CLAIM YOUR FREE SKIN"
+    _text(draw, label, (540, label_y), 24, MUTED, True, anchor="mm")
+    _text(draw, "LINK IN DESCRIPTION", (540, link_y), 27, WHITE, True, anchor="mm")
     return image
 
 
-def _draw_clip_overlay() -> Image.Image:
+def _draw_clip_overlay(title: str = "CS2 COMMUNITY HIGHLIGHT") -> Image.Image:
     overlay = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
-    draw.rounded_rectangle((50, 70, 850, 158), radius=22,
+    draw.rounded_rectangle((50, 70, 1030, 190), radius=22,
                            fill=(5, 9, 15, 205), outline=(*ACCENT, 230), width=2)
-    _text(draw, "CS2 COMMUNITY HIGHLIGHT", (82, 114), 26, WHITE, True, anchor="lm")
+    title = re.sub(r"\s+", " ", title).strip() or "CS2 COMMUNITY HIGHLIGHT"
+    if len(title) > 126:
+        title = title[:123].rstrip() + "..."
+    lines = _wrap(title, max_chars=52)
+    font_size = 24 if len(lines) == 1 else 21
+    start_y = 130 - (len(lines) - 1) * 14
+    for index, line in enumerate(lines):
+        _text(draw, line, (82, start_y + index * 28), font_size,
+              WHITE if index == 0 else ACCENT, True, anchor="lm")
     draw.rounded_rectangle((140, 1700, 940, 1780), radius=22, fill=(5, 9, 15, 190))
     _text(draw, "WATCH THE PLAY  ·  CS2", (540, 1740), 23, WHITE, True, anchor="mm")
     return overlay
@@ -292,7 +316,7 @@ def _probe_video(ffprobe: str, path: Path) -> tuple[float, bool]:
     duration = float(data["format"]["duration"])
     has_audio = any(stream.get("codec_type") == "audio" for stream in data.get("streams", []))
     if not math.isfinite(duration) or duration < MIN_CLIP_SECONDS:
-        raise RuntimeError(f"Dataset clip is too short for the promo intro and outro: {duration:.2f}s")
+        raise RuntimeError(f"Dataset clip is too short for a 12-second Short with the outro promo: {duration:.2f}s")
     return min(duration, MAX_CLIP_SECONDS), has_audio
 
 
@@ -307,37 +331,42 @@ def render_clip(clip_path: Path, copy: VideoCopy, output_path: Path,
         "Ten dollar free skin. Link in description.", voice,
         render_dir / "promo-voice.mp3",
     ))
-    intro_path = render_dir / "promo-intro.png"
+    title = str(copy.featured.get("name") or copy.title).strip()
+    title = re.sub(r"^CS2 Highlight:\s*", "", title, flags=re.IGNORECASE)
+    intro_paths = [render_dir / f"promo-intro-{number}.png" for number in (3, 2, 1)]
+    for path, number in zip(intro_paths, (3, 2, 1)):
+        _draw_promo_card("intro", title=title, countdown=number).save(path, optimize=True)
     outro_path = render_dir / "promo-outro.png"
     overlay_path = render_dir / "clip-overlay.png"
-    render_dir.mkdir(parents=True, exist_ok=True)
-    _draw_promo_card("intro").save(intro_path, optimize=True)
     _draw_promo_card("outro").save(outro_path, optimize=True)
-    _draw_clip_overlay().save(overlay_path, optimize=True)
+    _draw_clip_overlay(title).save(overlay_path, optimize=True)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    duration = clip_duration + 2 * PROMO_SECONDS
-    silence_duration = clip_duration if not has_audio else 0.1
-    command = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
-               "-loop", "1", "-framerate", "30", "-t", f"{PROMO_SECONDS:.3f}", "-i", str(intro_path),
-               "-i", str(clip_path),
-               "-loop", "1", "-framerate", "30", "-t", f"{PROMO_SECONDS:.3f}", "-i", str(outro_path),
-               "-i", str(promo_voice_path),
-               "-f", "lavfi", "-t", f"{silence_duration:.3f}", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
-               "-loop", "1", "-framerate", "30", "-t", f"{clip_duration:.3f}", "-i", str(overlay_path),
-               "-i", str(promo_voice_path),
-               "-f", "lavfi", "-t", f"{PROMO_SECONDS:.3f}", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"]
-    clip_audio = "1:a" if has_audio else "4:a"
+    duration = clip_duration + INTRO_SECONDS + PROMO_SECONDS
+    command = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error"]
+    for intro_path in intro_paths:
+        command.extend(["-loop", "1", "-framerate", "30", "-t", "1.000", "-i", str(intro_path)])
+    command.extend([
+        "-i", str(clip_path),
+        "-loop", "1", "-framerate", "30", "-t", f"{clip_duration:.3f}", "-i", str(overlay_path),
+        "-loop", "1", "-framerate", "30", "-t", f"{PROMO_SECONDS:.3f}", "-i", str(outro_path),
+        "-i", str(promo_voice_path), "-i", str(promo_voice_path),
+        "-f", "lavfi", "-t", f"{clip_duration:.3f}", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+    ])
+    clip_audio = "3:a" if has_audio else "8:a"
     filters = [
-        "[0:v]fps=30,scale=1080:1920,setsar=1,format=yuv420p,setpts=PTS-STARTPTS[intro_v]",
-        "[1:v]split=2[bg0][fg0]",
+        "[0:v]fps=30,scale=1080:1920,setsar=1,format=yuv420p,setpts=PTS-STARTPTS[intro3]",
+        "[1:v]fps=30,scale=1080:1920,setsar=1,format=yuv420p,setpts=PTS-STARTPTS[intro2]",
+        "[2:v]fps=30,scale=1080:1920,setsar=1,format=yuv420p,setpts=PTS-STARTPTS[intro1]",
+        "[intro3][intro2][intro1]concat=n=3:v=1:a=0[intro_v]",
+        "[3:v]split=2[bg0][fg0]",
         "[bg0]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=28:10,eq=brightness=-0.25,setsar=1[bg]",
         "[fg0]scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:(ow-iw)/2:(oh-ih)/2:color=black@0,format=rgba[fg]",
         "[bg][fg]overlay=(W-w)/2:(H-h)/2:shortest=1[base]",
-        f"[base][5:v]overlay=0:0:shortest=1,fps=30,trim=duration={clip_duration:.3f},setpts=PTS-STARTPTS,format=yuv420p[clip_v]",
-        "[2:v]fps=30,scale=1080:1920,setsar=1,format=yuv420p,setpts=PTS-STARTPTS[outro_v]",
-        f"[3:a]aresample=44100,aformat=channel_layouts=stereo,apad,atrim=duration={PROMO_SECONDS:.3f},asetpts=PTS-STARTPTS[intro_a]",
+        f"[base][4:v]overlay=0:0:shortest=1,fps=30,trim=duration={clip_duration:.3f},setpts=PTS-STARTPTS,format=yuv420p[clip_v]",
+        "[5:v]fps=30,scale=1080:1920,setsar=1,format=yuv420p,setpts=PTS-STARTPTS[outro_v]",
+        f"[6:a]aresample=44100,aformat=channel_layouts=stereo,apad,atrim=duration={INTRO_SECONDS:.3f},asetpts=PTS-STARTPTS[intro_a]",
         f"[{clip_audio}]aresample=44100,aformat=channel_layouts=stereo,apad,atrim=duration={clip_duration:.3f},asetpts=PTS-STARTPTS[clip_a]",
-        f"[6:a]aresample=44100,aformat=channel_layouts=stereo,apad,atrim=duration={PROMO_SECONDS:.3f},asetpts=PTS-STARTPTS[outro_a]",
+        f"[7:a]aresample=44100,aformat=channel_layouts=stereo,apad,atrim=duration={PROMO_SECONDS:.3f},asetpts=PTS-STARTPTS[outro_a]",
         "[intro_v][intro_a][clip_v][clip_a][outro_v][outro_a]concat=n=3:v=1:a=1[outv][prea]",
         "[prea]alimiter=limit=0.95[outa]",
     ]
