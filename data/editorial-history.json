@@ -23,5 +23,19 @@
     "status": "published",
     "title": "AK-47 Skin Battle: Both Under $10.00",
     "youtube_video_id": "2gRZOpkcp3c"
+  },
+  {
+    "format": "loadout",
+    "fingerprint": "0bb52c26a548c1c613f6",
+    "skins": [
+      "AK-47 | Ice Coaled",
+      "Desert Eagle | Mecha Industries",
+      "M4A4 | Sheet Lightning"
+    ],
+    "hook": "Would you equip this loadout?",
+    "captured_at": "2026-10-22T10:46:58.893603+00:00",
+    "status": "published",
+    "title": "Would You Equip This $14.15 CS2 Loadout?",
+    "youtube_video_id": "UCKIG_kpUQ4"
   }
 ]
