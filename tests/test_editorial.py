@@ -260,3 +260,60 @@ class PromoTests(unittest.TestCase):
         self.assertEqual(lines[0], 'Ten dollar free skin.')
         self.assertEqual(lines[-1], 'Ten dollar free skin.')
         self.assertEqual(lines[1:-1], copy.scene_lines)
+
+
+class AdaptiveVoiceTests(unittest.TestCase):
+    def test_compact_script_keeps_all_skins_prices_and_loadout_total(self):
+        from cs2_shorts.media import _compact_editorial_lines
+        raw, catalog = fixtures()
+        p = next(p for p in make_plans(eligible_rows(raw, catalog), [], 'USD', random.Random(3))
+                 if p.format == 'loadout')
+        copy = build_editorial_copy(p, local_script(p, [], random.Random(1)), 'TEST')
+        for level in (1, 2):
+            lines = _compact_editorial_lines(copy, 'USD', level)
+            self.assertEqual(len(lines), len(p.items) + 2)
+            for row, line in zip(p.items, lines[1:-1]):
+                self.assertIn(f"${row['price']:,.2f}", line)
+            self.assertIn(f"${sum(x['price'] for x in p.items):,.2f}", lines[-1])
+
+    def test_shortest_script_can_use_59_seconds_without_extending_ads(self):
+        from cs2_shorts.media import _editorial_promo_timing
+        durations, speeds = _editorial_promo_timing([2, 7, 12, 12, 7, 2], 3.0, 59)
+        self.assertEqual(durations[0], 3.0)
+        self.assertEqual(durations[-1], 3.0)
+        self.assertLessEqual(sum(durations), 59)
+        self.assertTrue(all(s <= 1.15 for s in speeds))
+
+    @unittest.skipUnless(__import__('shutil').which('ffmpeg') and __import__('shutil').which('ffprobe'), 'FFmpeg required')
+    def test_slow_measured_voice_rewrites_script_and_produces_complete_audio(self):
+        import wave
+        import subprocess
+        from cs2_shorts.media import _synthesize_aligned_voiceover
+        raw, catalog = fixtures()
+        p = make_plans(eligible_rows(raw, catalog), [], 'USD', random.Random(5))[0]
+        script = {'hook': ' '.join(['Long introduction'] * 20),
+                  'beats': [' '.join(['Long commentary'] * 20)] * len(p.items),
+                  'outro': ' '.join(['Long ending'] * 20)}
+        copy = build_editorial_copy(p, script, 'TEST')
+        original_lines = copy.scene_lines[:]
+        calls = []
+        async def voice(text, voice, path):
+            calls.append(text)
+            path = path.with_suffix('.wav')
+            seconds = max(1, len(text.split()) * .6)
+            with wave.open(str(path), 'wb') as wav:
+                wav.setnchannels(1); wav.setsampwidth(2); wav.setframerate(8000)
+                wav.writeframes(b'\0\0' * int(8000 * seconds))
+            return path
+        with tempfile.TemporaryDirectory() as d, patch('cs2_shorts.media._synthesize', voice):
+            audio, durations = _synthesize_aligned_voiceover('ffmpeg', 'ffprobe', copy, 'USD', Path(d), 'fixture')
+            actual = float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries',
+                'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', str(audio)], text=True))
+            self.assertAlmostEqual(actual, sum(durations), delta=.02)
+        self.assertNotEqual(copy.scene_lines, original_lines)
+        self.assertEqual(len(durations), len(p.items) + 4)
+        self.assertEqual(durations[0], 3.0)
+        self.assertEqual(durations[-1], 3.0)
+        self.assertLessEqual(sum(durations), 59)
+        self.assertEqual(copy.narration, ' '.join(copy.scene_lines))
+        self.assertEqual(calls.count('Ten dollar free skin.'), 1)

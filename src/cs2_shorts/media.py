@@ -537,21 +537,25 @@ def _scene_timing(speech_durations: list[float]) -> tuple[list[float], float]:
     return scene_durations, speed
 
 
-def _editorial_promo_timing(speech: list[float], promo_seconds: float) -> tuple[list[float], list[float]]:
+def _editorial_promo_timing(speech: list[float], promo_seconds: float,
+                           max_duration: float = 44.0) -> tuple[list[float], list[float]]:
     """Keep both ads exactly three seconds; fit complete content without cutting speech."""
     if promo_seconds != 3.0 or len(speech) < 5 or any(x <= 0 for x in speech):
         raise ValueError('Editorial promos require three seconds and complete content beats')
+    if not 12 <= max_duration <= 59:
+        raise ValueError('Editorial duration budget must be between 12 and 59 seconds')
+    content_budget = max_duration - 6.0
     middle = speech[1:-1]
     def at_speed(speed):
         return [max(2.6, x / speed + .28) for x in middle]
     speed = 1.0
-    if sum(at_speed(speed)) > 38:
+    if sum(at_speed(speed)) > content_budget:
         low, high = 1.0, 1.15
-        if sum(at_speed(high)) > 38:
+        if sum(at_speed(high)) > content_budget:
             raise RuntimeError('Editorial speech is too long for natural pace with two three-second ads')
         for _ in range(24):
             mid = (low + high) / 2
-            if sum(at_speed(mid)) > 38:
+            if sum(at_speed(mid)) > content_budget:
                 low = mid
             else:
                 high = mid
@@ -574,35 +578,81 @@ def _editorial_countdown_filter() -> str:
         for i in range(3))
 
 
+def _compact_editorial_lines(copy: VideoCopy, currency: str, level: int) -> list[str]:
+    """Shorten the script, not the audio; full item identities remain on screen."""
+    hooks = {
+        'budget': 'Which budget finish wins?', 'duel': 'Two finishes. Pick your favorite.',
+        'loadout': 'Would you equip this loadout?', 'wear': 'Same finish. Which wear would you choose?',
+        'premium_budget': 'Budget or premium? Your choice.',
+        'popular': 'Which finish would you equip?', 'watchlist': 'Which skin makes your shortlist?'}
+    lines = [hooks.get(copy.topic, 'Which finish gets your vote?')]
+    for item in copy.items:
+        name = _spoken_name(item['name'])
+        if level == 1:
+            wear = item['name'].rsplit('(', 1)[-1].rstrip(')')
+            lines.append(f"{name}. {wear}. {_money(item['price'], currency)}.")
+        else:
+            # Weapon and wear remain visible; retain finish and exact price in speech.
+            finish = item['name'].split(' | ', 1)[-1].split(' (', 1)[0]
+            lines.append(f"{finish}. {_money(item['price'], currency)}.")
+    if copy.topic == 'loadout':
+        lines.append(f"Total: {_money(sum(x['price'] for x in copy.items), currency)}. Would you equip this?")
+    else:
+        lines.append('Which one gets your vote?')
+    return lines
+
+
 def _synthesize_aligned_voiceover(ffmpeg: str, ffprobe: str, copy: VideoCopy,
                                   currency: str, data_dir: Path, voice: str
                                   ) -> tuple[Path, list[float]]:
     """Synthesize each visual beat separately, then pad it to its scene duration."""
-    lines = _voiceover_lines(copy, currency)
-    paths: list[Path] = []
-    speech_durations: list[float] = []
-    for index, line in enumerate(lines):
-        part = data_dir / f"voice-part-{index + 1:02d}.mp3"
-        synthesized = asyncio.run(_synthesize(line, voice, part))
-        result = subprocess.run(
-            [ffprobe, "-v", "error", "-show_entries", "format=duration", "-of",
-             "default=noprint_wrappers=1:nokey=1", str(synthesized)],
-            check=True, capture_output=True, text=True,
-        )
-        speech_duration = float(result.stdout.strip())
-        if speech_duration <= 0:
-            raise RuntimeError(f"Speech synthesis generated empty audio for beat {index + 1}")
-        paths.append(synthesized)
-        speech_durations.append(speech_duration)
-
-    # Promo cards stay readable; item cards stay up through their own spoken
-    # name and price. Compress unusually slow TTS slightly, preserving pitch.
-    if copy.series == "editorial" and copy.promo_seconds:
-        scene_durations, beat_speeds = _editorial_promo_timing(speech_durations, copy.promo_seconds)
-        speed = max(beat_speeds[1:-1])
-    else:
-        scene_durations, speed = _scene_timing(speech_durations)
-        beat_speeds = [speed] * len(speech_durations)
+    editorial_promo = copy.series == "editorial" and bool(copy.promo_seconds)
+    variants = [copy.scene_lines]
+    if editorial_promo:
+        variants += [_compact_editorial_lines(copy, currency, 1),
+                     _compact_editorial_lines(copy, currency, 2)]
+    # Reuse unchanged speech (including the ad) during local script revisions.
+    cache: dict[str, tuple[Path, float]] = {}
+    for revision, content_lines in enumerate(variants):
+        promo_line = "Ten dollar free skin." if revision == 0 else "Free skin."
+        lines = ([promo_line, *content_lines, promo_line]
+                 if editorial_promo else _voiceover_lines(copy, currency))
+        paths, speech_durations = [], []
+        for index, line in enumerate(lines):
+            if line not in cache:
+                part = data_dir / f"voice-part-{index + 1:02d}-rev-{revision}.mp3"
+                synthesized = asyncio.run(_synthesize(line, voice, part))
+                result = subprocess.run(
+                    [ffprobe, "-v", "error", "-show_entries", "format=duration", "-of",
+                     "default=noprint_wrappers=1:nokey=1", str(synthesized)],
+                    check=True, capture_output=True, text=True,
+                )
+                speech_duration = float(result.stdout.strip())
+                if speech_duration <= 0:
+                    raise RuntimeError(f"Speech synthesis generated empty audio for beat {index + 1}")
+                cache[line] = (synthesized, speech_duration)
+            path, speech_duration = cache[line]
+            paths.append(path)
+            speech_durations.append(speech_duration)
+        if editorial_promo:
+            try:
+                # Prefer 44s. On the shortest script, allow up to 59s at natural pace.
+                limit = 59.0 if revision == 2 else 44.0
+                scene_durations, beat_speeds = _editorial_promo_timing(
+                    speech_durations, copy.promo_seconds, limit)
+            except RuntimeError:
+                if revision == len(variants) - 1:
+                    raise
+                log.info('Editorial voice needs a shorter script; rebuilding speech (revision %s)', revision + 1)
+                continue
+            speed = max(beat_speeds[1:-1])
+            # Captions and the evidence file must show the script actually spoken.
+            copy.scene_lines = list(content_lines)
+            copy.narration = ' '.join(content_lines)
+        else:
+            scene_durations, speed = _scene_timing(speech_durations)
+            beat_speeds = [speed] * len(speech_durations)
+        break
     if copy.series == "editorial" and speed > 1.15:
         raise RuntimeError("Editorial speech is too long for a natural-paced Short; publishing blocked")
     if speed > 1.0:
@@ -615,9 +665,8 @@ def _synthesize_aligned_voiceover(ffmpeg: str, ffprobe: str, copy: VideoCopy,
     filters: list[str] = []
     for index, (speech_duration, scene_duration) in enumerate(zip(speech_durations, scene_durations)):
         beat_speed = beat_speeds[index]
-        pad = max(0.01, scene_duration - speech_duration / beat_speed)
         filters.append(
-            f"[{index}:a]atempo={beat_speed:.8f},aresample=44100,apad=pad_dur={pad:.4f},"
+            f"[{index}:a]atempo={beat_speed:.8f},aresample=44100,apad=whole_dur={scene_duration:.4f},"
             f"atrim=duration={scene_duration:.4f}[beat{index}]"
         )
     concat_inputs = "".join(f"[beat{index}]" for index in range(len(paths)))
@@ -719,8 +768,9 @@ def render_video(copy: VideoCopy, currency: str, data_dir: Path, output_path: Pa
         raise RuntimeError(f"Rendered file is not 1080x1920: {verify}")
     match = re.search(r"duration=([\d.]+)", verify)
     final_duration = float(match.group(1)) if match else 0
-    if final_duration < 12 or final_duration > 45:
-        raise RuntimeError(f"Rendered Short duration outside 12–45 seconds: {final_duration:.2f}")
+    max_duration = 59.1 if copy.series == "editorial" and copy.promo_seconds else 45
+    if final_duration < 12 or final_duration > max_duration:
+        raise RuntimeError(f"Rendered Short duration outside 12–{max_duration:g} seconds: {final_duration:.2f}")
     return final_duration
 
 

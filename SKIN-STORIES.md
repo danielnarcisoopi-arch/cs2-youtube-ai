@@ -49,7 +49,7 @@ Não publica sem imagens exatas, preços válidos ou um tema novo. Não usa pre�
 
 ## Validação desta versão
 
-- **19 testes offline passaram**, incluindo simulação de 21 vídeos consecutivos, rotação dos sete formatos, proteção por finish, cálculos de orçamento e diferenças de preço, aberturas sem repetição enquanto há variantes disponíveis e persistência de histórico.
+- **22 testes offline passaram**, incluindo simulação de 21 vídeos consecutivos, rotação dos sete formatos, proteção por finish, cálculos de orçamento e diferenças de preço, aberturas sem repetição enquanto há variantes disponíveis e persistência de histórico.
 - O fluxo de publicação foi exercitado sem qualquer chave de IA, com os serviços externos simulados. Isto não é uma publicação real.
 - Compilação Python validada e montagem de MP4 vertical testada com arte sintética e áudio de teste.
 - Skinport, imagens, serviços de voz e publicação real não foram validados ponta a ponta neste ambiente. O primeiro preview manual no GitHub continua necessário. Nenhum vídeo foi publicado nesta sessão.
@@ -65,3 +65,14 @@ Para gerar só o plano e o guião local:
 ```bash
 UPLOAD_ENABLED=false python -m cs2_shorts.editorial --plan-only
 ```
+
+
+## Correção da duração da narração
+
+A montagem mede a duração real de cada fala antes de definir as cenas. Se o guião exceder o orçamento de tempo, cria uma versão mais curta e volta a sintetizar apenas o texto alterado. Há duas versões de encurtamento: primeiro conserva nome, wear e preço, depois conserva finish e preço na voz, mantendo a referência completa no ecrã.
+
+O objetivo continua a ser 44 segundos. Na versão mais curta, pode usar até 59 segundos para manter um ritmo natural. A aceleração do conteúdo é limitada a 1,15x. Se mesmo assim não couber, apresenta um erro em vez de cortar palavras. Os anúncios mantêm exatamente três segundos cada; o anúncio escrito, a contagem 3/2/1 e o link continuam iguais. A frase falada do anúncio pode ser mais curta na versão adaptada.
+
+As legendas e o JSON são atualizados para corresponder ao texto realmente narrado. O áudio é preenchido até à duração de cada cena, evitando desvios acumulados entre imagem e voz.
+
+Esta correção passou 22 testes locais, incluindo síntese simulada com voz lenta e produção de áudio real por FFmpeg. Também foi testada a montagem MP4 completa com guião inicialmente demasiado longo, arte sintética e áudio de teste. Não foi feita uma publicação real nem uma chamada aos serviços de voz externos.

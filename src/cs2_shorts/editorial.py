@@ -328,7 +328,8 @@ def run(requested='auto', plan_only=False) -> Path:
     # Moving catalog art is deliberate: no unrelated gameplay, no misrepresented craft.
     duration = render_video(copy, settings.currency, settings.data_dir / 'editorial-render', video,
                             settings.voice, True, settings.image_timeout, False)
-    metadata.update(status='rendered', duration_seconds=duration)
+    metadata.update(status='rendered', duration_seconds=duration,
+                    scene_lines=copy.scene_lines, hook=copy.scene_lines[0])
     target.write_text(json.dumps(metadata, indent=2), encoding='utf-8')
     # Reserve before upload: a network error after YouTube accepts the video must not
     # cause an automated rerun to repeat the same topic. Never retry videos.insert here.
