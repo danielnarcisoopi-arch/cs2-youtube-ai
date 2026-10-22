@@ -51,5 +51,17 @@
     "status": "published",
     "title": "3 MAC-10 Skins Under $20.00 \u2014 Which Wins?",
     "youtube_video_id": "_pLmI9ziFkk"
+  },
+  {
+    "format": "premium_budget",
+    "fingerprint": "e742c4d95a6fd7e970ce",
+    "skins": [
+      "MAC-10 | Neon Rider",
+      "MAC-10 | Pipsqueak"
+    ],
+    "hook": "The expensive option has competition. Which finish would you actually equip?",
+    "captured_at": "2026-10-22T19:32:23.278105+00:00",
+    "status": "upload_pending",
+    "title": "MAC-10: Budget Finish vs Premium Price"
   }
 ]
