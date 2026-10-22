@@ -10,5 +10,18 @@
     "status": "published",
     "title": "MP9 | Stained Glass: Is the Higher Asking Price Worth It?",
     "youtube_video_id": "GMpc86VwCGw"
+  },
+  {
+    "format": "duel",
+    "fingerprint": "9662af7021d0dadb988d",
+    "skins": [
+      "AK-47 | Safety Net",
+      "AK-47 | Steel Delta"
+    ],
+    "hook": "One weapon slot, two choices. Which side are you taking today?",
+    "captured_at": "2026-10-22T10:33:10.409748+00:00",
+    "status": "published",
+    "title": "AK-47 Skin Battle: Both Under $10.00",
+    "youtube_video_id": "2gRZOpkcp3c"
   }
 ]
