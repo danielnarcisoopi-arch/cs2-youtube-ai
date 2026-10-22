@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from cs2_shorts.editorial import (FORMATS, base_name, build_editorial_copy, eligible_rows,
-    load_history, make_plans, select_plan, validate_creative, write_history)
+    load_history, make_plans, select_plan, local_script, write_history)
 
 
 def fixtures():
@@ -63,18 +63,6 @@ class EditorialTests(unittest.TestCase):
     def test_exhaustion_does_not_repeat(self):
         with self.assertRaises(RuntimeError):
             select_plan([], [], random.Random(1))
-
-    def test_unverified_ai_claims_blocked(self):
-        for bad in ('Guaranteed profit for you', 'This costs $5 today', 'Rare stickers add value',
-                    'An investment worth making', 'Five dollars buys this', 'The cheapest finish available'):
-            with self.subTest(bad=bad), self.assertRaises(ValueError):
-                validate_creative({'hook': bad, 'beats': ['Which finish gets your vote?'],
-                                   'outro': 'Tell me your favorite finish.'}, 1)
-
-    def test_mismatched_ai_beats_blocked(self):
-        with self.assertRaises(ValueError):
-            validate_creative({'hook': 'Which finish would you equip?', 'beats': [],
-                               'outro': 'Comment your favorite finish.'}, 3)
 
     def test_speech_actually_reaches_renderer(self):
         from cs2_shorts.media import _voiceover_lines, make_scenes
@@ -157,3 +145,81 @@ class HistoryTransportTests(unittest.TestCase):
                  patch('sys.argv', ['history', 'restore']), self.assertRaises(ValueError):
                 m.main()
             self.assertEqual(p.read_text(), '["keep me"]')
+
+
+class LocalWriterTests(unittest.TestCase):
+    def plans(self):
+        raw, catalog = fixtures()
+        return make_plans(eligible_rows(raw, catalog), [], 'USD', random.Random(3))
+
+    def test_every_format_has_local_script_and_aligned_beats(self):
+        formats = set()
+        for plan in self.plans():
+            script = local_script(plan, [], random.Random(1))
+            self.assertEqual(len(script['beats']), len(plan.items))
+            self.assertTrue(script['hook'])
+            self.assertTrue(all(script['beats']))
+            copy = build_editorial_copy(plan, script, 'TEST TIMESTAMP')
+            self.assertEqual(copy.scene_lines[0], script['hook'])
+            self.assertEqual(len(copy.scene_lines), len(plan.items) + 2)
+            formats.add(plan.format)
+        self.assertEqual(formats, set(FORMATS))
+
+    def test_local_hooks_do_not_repeat_while_variants_available(self):
+        from cs2_shorts.editorial import HOOKS
+        for fmt in FORMATS:
+            plan = next(p for p in self.plans() if p.format == fmt)
+            history = []
+            for i in range(len(HOOKS[fmt])):
+                script = local_script(plan, history, random.Random(i))
+                self.assertNotIn(script['hook'], {h['hook'] for h in history})
+                history.append({'hook': script['hook']})
+
+    def test_duel_price_gap_and_loadout_total_are_computed(self):
+        from cs2_shorts.editorial import Plan, money
+        items = [{'name': 'AK-47 | Fixture A (Field-Tested)', 'price': 3.25, 'quantity': 10},
+                 {'name': 'AK-47 | Fixture B (Field-Tested)', 'price': 7.50, 'quantity': 20}]
+        p = Plan('duel', 'Test', items, ['A', 'B'], 'hook', 'outro', 'USD')
+        script = local_script(p, [], random.Random(1))
+        self.assertIn('$4.25 more', script['beats'][1])
+        p.format = 'loadout'
+        script = local_script(p, [], random.Random(1))
+        self.assertIn('$10.75', script['beats'][1])
+
+    def test_series_has_no_language_model_connection_or_secret_requirement(self):
+        root = Path(__file__).resolve().parents[1]
+        for file in (root / 'src/cs2_shorts/editorial.py', root / '.github/workflows/cs2-skin-stories.yml'):
+            source = file.read_text().lower()
+            self.assertNotIn('api.openai.com', source)
+            self.assertNotIn('openai_api_key', source)
+            self.assertNotIn('creative_script', source)
+            self.assertNotIn('gpt-4', source)
+
+    def test_run_can_publish_without_any_language_model_secret(self):
+        import sys
+        from types import ModuleType, SimpleNamespace
+        from unittest.mock import Mock
+        from cs2_shorts.editorial import run
+        raw, catalog = fixtures()
+        with tempfile.TemporaryDirectory() as d:
+            cfg = SimpleNamespace(currency='USD', data_dir=Path(d) / 'data',
+                output_dir=Path(d) / 'output', image_timeout=8, voice='test', upload_enabled=True)
+            config = ModuleType('cs2_shorts.config')
+            config.settings, config.validate_settings = cfg, Mock()
+            provider = ModuleType('cs2_shorts.providers.skinport')
+            provider.SkinportProvider = Mock(return_value=SimpleNamespace(_get=lambda endpoint: raw))
+            youtube = ModuleType('cs2_shorts.youtube')
+            youtube.upload_video = Mock(return_value='test-video-id')
+            with patch.dict(sys.modules, {'cs2_shorts.config': config,
+                'cs2_shorts.providers.skinport': provider, 'cs2_shorts.youtube': youtube}), \
+                patch('cs2_shorts.media._skin_catalog', return_value=catalog), \
+                patch('cs2_shorts.media.render_video', return_value=30), \
+                patch.dict('os.environ', {}, clear=True):
+                output = run()
+            youtube.upload_video.assert_called_once()
+            history = load_history(cfg.data_dir / 'editorial-history.json')
+            self.assertEqual(history[-1]['status'], 'published')
+            self.assertEqual(history[-1]['youtube_video_id'], 'test-video-id')
+            metadata = json.loads(output.with_suffix('.json').read_text())
+            self.assertEqual(metadata['script_source'], 'local format writer with verified market facts')
+            self.assertEqual(metadata['status'], 'published')
