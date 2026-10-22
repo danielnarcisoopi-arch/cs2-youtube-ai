@@ -11,8 +11,6 @@ import time
 from pathlib import Path
 from urllib.parse import urlparse
 
-import edge_tts
-import requests
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 from .scripts import VideoCopy, _spoken_name
@@ -68,6 +66,7 @@ def _wrap_name(name: str, max_width: int = 930, size: int = 43) -> list[str]:
 
 def _skin_image(name: str, target: Path, timeout: int) -> bool:
     """Use a single exact-match weapon cutout, never a marketplace screenshot."""
+    import requests
     if target.exists():
         try:
             with Image.open(target) as image:
@@ -94,6 +93,7 @@ def _skin_image(name: str, target: Path, timeout: int) -> bool:
 
 def _skin_catalog(data_dir: Path, timeout: int) -> list[dict]:
     """Load the canonical weapon-skin catalog, using its cache during outages."""
+    import requests
     data_dir.mkdir(parents=True, exist_ok=True)
     cache = data_dir / "skins-catalog.json"
     cached = None
@@ -236,6 +236,9 @@ def _draw_weapon(frame: Image.Image, art_path: Path | None, box: tuple[int, int,
 def make_scenes(copy: VideoCopy, currency: str, data_dir: Path,
                 image_fetch: bool = True, image_timeout: int = 8) -> list[Path]:
     """Create matching promo, skin-price, and promo-outro scenes."""
+    if copy.series == "editorial":
+        from .editorial_visuals import make_editorial_scenes
+        return make_editorial_scenes(copy, currency, data_dir, image_timeout)
     data_dir.mkdir(parents=True, exist_ok=True)
     items = (copy.items or [copy.featured])[:5]
     art_paths: list[Path] = []
@@ -286,6 +289,8 @@ def make_scenes(copy: VideoCopy, currency: str, data_dir: Path,
 
 async def _synthesize(text: str, voice: str, path: Path) -> Path:
     """Prefer a premium natural voice when configured, then Edge neural, then local Piper."""
+    import requests
+    import edge_tts
     api_key = os.getenv("ELEVENLABS_API_KEY")
     voice_id = os.getenv("ELEVENLABS_VOICE_ID")
     if api_key and voice_id:
@@ -486,6 +491,10 @@ def _render_pov_video(ffmpeg: str, ffprobe: str, copy: VideoCopy, currency: str,
 
 def _voiceover_lines(copy: VideoCopy, currency: str) -> list[str]:
     """Build one spoken beat for each matching promo or skin-price scene."""
+    if copy.scene_lines:
+        if len(copy.scene_lines) != len(copy.items) + 2:
+            raise ValueError("Editorial speech must match the hook, item scenes and outro")
+        return copy.scene_lines
     items = (copy.items or [copy.featured])[:5]
     lines = ["Get a ten dollar free skin. Link in description."]
     for item in items:
@@ -550,6 +559,8 @@ def _synthesize_aligned_voiceover(ffmpeg: str, ffprobe: str, copy: VideoCopy,
     # Promo cards stay readable; item cards stay up through their own spoken
     # name and price. Compress unusually slow TTS slightly, preserving pitch.
     scene_durations, speed = _scene_timing(speech_durations)
+    if copy.series == "editorial" and speed > 1.15:
+        raise RuntimeError("Editorial speech is too long for a natural-paced Short; publishing blocked")
     if speed > 1.0:
         log.warning("Skin-price narration exceeded 44 seconds at natural pace; applying %.2fx time compression", speed)
     duration = sum(scene_durations)

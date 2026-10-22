@@ -16,6 +16,9 @@ class VideoCopy:
     featured: dict[str, Any]
     hook_variant: str = "market_move"
     items: list[dict[str, Any]] = field(default_factory=list)
+    scene_lines: list[str] = field(default_factory=list)
+    scene_labels: list[str] = field(default_factory=list)
+    series: str = "market"
 
 
 _ONES = ("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
