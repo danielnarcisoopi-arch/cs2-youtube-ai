@@ -494,6 +494,8 @@ def _voiceover_lines(copy: VideoCopy, currency: str) -> list[str]:
     if copy.scene_lines:
         if len(copy.scene_lines) != len(copy.items) + 2:
             raise ValueError("Editorial speech must match the hook, item scenes and outro")
+        if copy.promo_seconds:
+            return ["Ten dollar free skin.", *copy.scene_lines, "Ten dollar free skin."]
         return copy.scene_lines
     items = (copy.items or [copy.featured])[:5]
     lines = ["Get a ten dollar free skin. Link in description."]
@@ -535,6 +537,43 @@ def _scene_timing(speech_durations: list[float]) -> tuple[list[float], float]:
     return scene_durations, speed
 
 
+def _editorial_promo_timing(speech: list[float], promo_seconds: float) -> tuple[list[float], list[float]]:
+    """Keep both ads exactly three seconds; fit complete content without cutting speech."""
+    if promo_seconds != 3.0 or len(speech) < 5 or any(x <= 0 for x in speech):
+        raise ValueError('Editorial promos require three seconds and complete content beats')
+    middle = speech[1:-1]
+    def at_speed(speed):
+        return [max(2.6, x / speed + .28) for x in middle]
+    speed = 1.0
+    if sum(at_speed(speed)) > 38:
+        low, high = 1.0, 1.15
+        if sum(at_speed(high)) > 38:
+            raise RuntimeError('Editorial speech is too long for natural pace with two three-second ads')
+        for _ in range(24):
+            mid = (low + high) / 2
+            if sum(at_speed(mid)) > 38:
+                low = mid
+            else:
+                high = mid
+        speed = high
+    durations = [3.0, *at_speed(speed), 3.0]
+    if sum(durations) < 12:
+        durations[1] += 12 - sum(durations)
+    speeds = [max(1.0, speech[0] / 2.95), *([speed] * len(middle)), max(1.0, speech[-1] / 2.95)]
+    if max(speeds[0], speeds[-1]) > 1.3:
+        raise RuntimeError('Promo voice is too slow for three seconds; choose a faster voice')
+    return durations, speeds
+
+
+def _editorial_countdown_filter() -> str:
+    """Frame-clock countdown: exactly 3, 2, 1 over the first three seconds."""
+    font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
+    return ','.join(
+        f"drawtext=fontfile={font}:text='{3 - i}':fontsize=150:fontcolor=white:"
+        f"x=(w-tw)/2:y=1480-th/2:enable='gte(t,{i})*lt(t,{i + 1})'"
+        for i in range(3))
+
+
 def _synthesize_aligned_voiceover(ffmpeg: str, ffprobe: str, copy: VideoCopy,
                                   currency: str, data_dir: Path, voice: str
                                   ) -> tuple[Path, list[float]]:
@@ -558,7 +597,12 @@ def _synthesize_aligned_voiceover(ffmpeg: str, ffprobe: str, copy: VideoCopy,
 
     # Promo cards stay readable; item cards stay up through their own spoken
     # name and price. Compress unusually slow TTS slightly, preserving pitch.
-    scene_durations, speed = _scene_timing(speech_durations)
+    if copy.series == "editorial" and copy.promo_seconds:
+        scene_durations, beat_speeds = _editorial_promo_timing(speech_durations, copy.promo_seconds)
+        speed = max(beat_speeds[1:-1])
+    else:
+        scene_durations, speed = _scene_timing(speech_durations)
+        beat_speeds = [speed] * len(speech_durations)
     if copy.series == "editorial" and speed > 1.15:
         raise RuntimeError("Editorial speech is too long for a natural-paced Short; publishing blocked")
     if speed > 1.0:
@@ -570,9 +614,10 @@ def _synthesize_aligned_voiceover(ffmpeg: str, ffprobe: str, copy: VideoCopy,
         command.extend(["-i", str(path)])
     filters: list[str] = []
     for index, (speech_duration, scene_duration) in enumerate(zip(speech_durations, scene_durations)):
-        pad = max(0.01, scene_duration - speech_duration / speed)
+        beat_speed = beat_speeds[index]
+        pad = max(0.01, scene_duration - speech_duration / beat_speed)
         filters.append(
-            f"[{index}:a]atempo={speed:.5f},aresample=44100,apad=pad_dur={pad:.4f},"
+            f"[{index}:a]atempo={beat_speed:.8f},aresample=44100,apad=pad_dur={pad:.4f},"
             f"atrim=duration={scene_duration:.4f}[beat{index}]"
         )
     concat_inputs = "".join(f"[beat{index}]" for index in range(len(paths)))
@@ -640,11 +685,13 @@ def render_video(copy: VideoCopy, currency: str, data_dir: Path, output_path: Pa
     filters: list[str] = []
     for index in range(len(scenes)):
         direction = "-" if index % 2 else "+"
+        countdown = ("," + _editorial_countdown_filter()
+                     if index == 0 and copy.series == "editorial" and copy.promo_seconds else "")
         filters.append(
             f"[{index}:v]zoompan=z='min(zoom+0.00028,1.04)':"
             f"x='iw/2-(iw/zoom/2){direction}2*sin(on/28)':y='ih/2-(ih/zoom/2)':"
             f"d=1:s=1080x1920:fps=30,trim=duration={scene_durations[index]:.4f},"
-            f"setpts=PTS-STARTPTS,setsar=1[v{index}]"
+            f"setpts=PTS-STARTPTS,setsar=1{countdown}[v{index}]"
         )
     concat_inputs = "".join(f"[v{i}]" for i in range(len(scenes)))
     filters.append(f"{concat_inputs}concat=n={len(scenes)}:v=1:a=0[vfinal]")

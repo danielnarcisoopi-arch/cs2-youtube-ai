@@ -15,6 +15,7 @@ from pathlib import Path
 
 
 from .scripts import VideoCopy, _spoken_name
+from .promotion import add_promo_link
 
 log = logging.getLogger(__name__)
 FORMATS = ('budget', 'duel', 'loadout', 'wear', 'premium_budget', 'popular', 'watchlist')
@@ -269,10 +270,10 @@ def build_editorial_copy(plan: Plan, script: dict | None, captured: str) -> Vide
                    "Picks are subjective, not investment recommendations.\n"
                    "Data: https://skinport.com/\nArt: https://github.com/ByMykel/CSGO-API\n"
                    "#CS2 #CS2Skins #CounterStrike2 #Shorts")
-    return VideoCopy(title=plan.title, description=description, tags=['CS2', 'CS2 skins', 'loadout', 'Shorts'],
+    return VideoCopy(title=plan.title, description=add_promo_link(description), tags=['CS2', 'CS2 skins', 'loadout', 'Shorts'],
                      narration=' '.join(lines), topic=plan.format, featured=plan.items[0],
                      items=plan.items, scene_lines=lines,
-                     scene_labels=[plan.title, *plan.labels, 'YOUR TURN'], series='editorial')
+                     scene_labels=[plan.title, *plan.labels, 'YOUR TURN'], series='editorial', promo_seconds=3.0)
 
 
 def load_history(path: Path) -> list[dict]:

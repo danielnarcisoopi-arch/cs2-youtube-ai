@@ -68,7 +68,7 @@ class EditorialTests(unittest.TestCase):
         from cs2_shorts.media import _voiceover_lines, make_scenes
         plan = make_plans(self.rows, [], 'USD', random.Random(2))[0]
         copy = build_editorial_copy(plan, None, '2026-10-22T10:00:00Z')
-        self.assertEqual(_voiceover_lines(copy, 'USD'), copy.scene_lines)
+        self.assertEqual(_voiceover_lines(copy, 'USD')[1:-1], copy.scene_lines)
         self.assertEqual(len(copy.scene_lines), len(plan.items) + 2)
         self.assertTrue(all(x['name'] in copy.description for x in plan.items))
         self.assertNotIn('free skin', ' '.join(copy.scene_lines))
@@ -223,3 +223,40 @@ class LocalWriterTests(unittest.TestCase):
             metadata = json.loads(output.with_suffix('.json').read_text())
             self.assertEqual(metadata['script_source'], 'local format writer with verified market facts')
             self.assertEqual(metadata['status'], 'published')
+
+
+class PromoTests(unittest.TestCase):
+    def test_ads_are_exactly_three_seconds_and_content_is_not_cut(self):
+        from cs2_shorts.media import _editorial_promo_timing
+        speech = [2.4, 4, 7, 7, 4, 2.4]
+        durations, speeds = _editorial_promo_timing(speech, 3.0)
+        self.assertEqual(durations[0], 3.0)
+        self.assertEqual(durations[-1], 3.0)
+        self.assertTrue(all(d >= s / rate for d, s, rate in zip(durations, speech, speeds)))
+        self.assertLessEqual(sum(durations), 44.0)
+
+    def test_overlong_content_is_rejected_instead_of_extending_ad_or_cutting_audio(self):
+        from cs2_shorts.media import _editorial_promo_timing
+        with self.assertRaises(RuntimeError):
+            _editorial_promo_timing([2, 15, 20, 20, 15, 2], 3.0)
+
+    def test_countdown_has_exact_three_second_intervals(self):
+        from cs2_shorts.media import _editorial_countdown_filter
+        value = _editorial_countdown_filter()
+        for i, digit in enumerate((3, 2, 1)):
+            self.assertIn(f"text='{digit}'", value)
+            self.assertIn(f"enable='gte(t,{i})*lt(t,{i + 1})'", value)
+
+    def test_same_referral_link_is_first_in_description_and_promo_speech_wraps_content(self):
+        from cs2_shorts.editorial import Plan
+        from cs2_shorts.media import _voiceover_lines
+        from cs2_shorts.promotion import PROMO_URL
+        items = [{'name': 'AK-47 | Fixture (Field-Tested)', 'price': 3.0, 'quantity': 5}]
+        plan = Plan('budget', 'Test title', items, ['PICK'], 'Test hook here', 'Test outro here', 'USD', 10)
+        copy = build_editorial_copy(plan, None, 'TEST')
+        self.assertEqual(copy.description.splitlines()[0], '10$ FREE SKIN: ' + PROMO_URL)
+        self.assertEqual(copy.promo_seconds, 3.0)
+        lines = _voiceover_lines(copy, 'USD')
+        self.assertEqual(lines[0], 'Ten dollar free skin.')
+        self.assertEqual(lines[-1], 'Ten dollar free skin.')
+        self.assertEqual(lines[1:-1], copy.scene_lines)

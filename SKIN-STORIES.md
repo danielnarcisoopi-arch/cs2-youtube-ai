@@ -33,6 +33,12 @@ O texto é programático e factual; não é um guião livre escrito por IA. A va
 
 Em **Actions → CS2 Skin Stories → Run workflow**, escolhe `format = auto` e mantém **upload desmarcado** no primeiro teste. O artifact `cs2-skin-story-…` contém o vídeo MP4 e o JSON de evidências. Para uma publicação manual, marca upload. As execuções agendadas publicam automaticamente quando todos os passos têm sucesso.
 
+## Anúncio e contagem regressiva
+
+O vídeo começa com o título acima do anúncio **10$ FREE SKIN**, o endereço **clash.gg/r/CSSKINNS** e a contagem **3 → 2 → 1**, um número por segundo. Esta abertura dura exatamente três segundos. Depois começa o hook e o conteúdo das skins. No fim, o anúncio volta a aparecer durante três segundos, sem contagem regressiva.
+
+A descrição do YouTube começa com o mesmo link dos outros workflows, obtido de `promotion.py`. A narração curta dos anúncios é alinhada com os três segundos; não corta a narração do conteúdo para encaixar o anúncio. A montagem foi testada com arte sintética e áudio de teste, incluindo extração dos fotogramas nos três números e após a transição.
+
 ## Imagem, voz e dados
 
 Cada cena mostra a arte exata da skin escolhida, com movimento de zoom/pan, nome, wear, preço e texto sincronizado com a narração. Usa arte de catálogo em movimento, não uma gravação do jogo ou um inspect 3D. Os preços são lowest asks em USD da Skinport, com stock, não preços Steam nem vendas concluídas. As imagens ilustram a skin; inspeciona o float e pattern do item real antes de comprar.
@@ -43,7 +49,7 @@ Não publica sem imagens exatas, preços válidos ou um tema novo. Não usa pre�
 
 ## Validação desta versão
 
-- **15 testes offline passaram**, incluindo simulação de 21 vídeos consecutivos, rotação dos sete formatos, proteção por finish, cálculos de orçamento e diferenças de preço, aberturas sem repetição enquanto há variantes disponíveis e persistência de histórico.
+- **19 testes offline passaram**, incluindo simulação de 21 vídeos consecutivos, rotação dos sete formatos, proteção por finish, cálculos de orçamento e diferenças de preço, aberturas sem repetição enquanto há variantes disponíveis e persistência de histórico.
 - O fluxo de publicação foi exercitado sem qualquer chave de IA, com os serviços externos simulados. Isto não é uma publicação real.
 - Compilação Python validada e montagem de MP4 vertical testada com arte sintética e áudio de teste.
 - Skinport, imagens, serviços de voz e publicação real não foram validados ponta a ponta neste ambiente. O primeiro preview manual no GitHub continua necessário. Nenhum vídeo foi publicado nesta sessão.

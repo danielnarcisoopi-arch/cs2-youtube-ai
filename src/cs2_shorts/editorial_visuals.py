@@ -80,4 +80,33 @@ def make_editorial_scenes(copy: VideoCopy, currency: str, data_dir: Path, timeou
         path = data_dir / f'beat-{i + 1:02d}.png'
         frame.save(path)
         paths.append(path)
+    if copy.promo_seconds:
+        intro = promo_frame(copy, accent, data_dir / 'promo-intro.png', True)
+        outro = promo_frame(copy, accent, data_dir / 'promo-outro.png', False)
+        return [intro, *paths, outro]
     return paths
+
+
+def promo_frame(copy: VideoCopy, accent: tuple, output: Path, intro: bool) -> Path:
+    from .promotion import PROMO_MESSAGE, PROMO_URL
+    frame = _background(0, accent)
+    draw = ImageDraw.Draw(frame)
+    _text(draw, 'CS2 / SKIN STORIES', (76, 160), 25, accent, True)
+    block(draw, copy.title if intro else 'YOUR NEXT SKIN STARTS HERE',
+          (76, 290), 58, WHITE, width=880, max_lines=4)
+    draw.rounded_rectangle((64, 680, 1016, 1190), radius=40,
+                           fill=(9, 16, 24), outline=accent, width=5)
+    title, cta = PROMO_MESSAGE.split(', ', 1)
+    _text(draw, title, (540, 820), 78, accent, True, anchor='mm')
+    _text(draw, cta, (540, 945), 39, WHITE, True, anchor='mm')
+    url = PROMO_URL.split('://', 1)[-1]
+    _text(draw, url, (540, 1080), 38, accent, True, anchor='mm')
+    if intro:
+        _text(draw, 'VIDEO STARTS IN', (540, 1330), 29, accent, True, anchor='mm')
+        draw.ellipse((415, 1355, 665, 1605), outline=accent, width=4)
+        # Numerals are overlaid by FFmpeg on the video clock, after zoom.
+    else:
+        block(draw, 'Link in description', (76, 1390), 52, WHITE, max_lines=2)
+    _text(draw, 'PROMOTION', (76, 1750), 22, MUTED, True)
+    frame.save(output)
+    return output
