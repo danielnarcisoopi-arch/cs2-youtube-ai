@@ -1,4 +1,4 @@
-name: CS2 Skin Stories (AI)
+name: CS2 Skin Stories
 
 on:
   workflow_dispatch:
@@ -29,8 +29,6 @@ jobs:
     timeout-minutes: 35
     env:
       MARKET_CURRENCY: USD
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      EDITORIAL_AI_MODEL: ${{ vars.EDITORIAL_AI_MODEL || 'gpt-4.1-mini' }}
       UPLOAD_ENABLED: ${{ github.event_name == 'schedule' || inputs.upload }}
       YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
       YOUTUBE_PRIVACY_STATUS: public
@@ -48,10 +46,9 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - name: Check configuration before spending on generation
+      - name: Check publishing configuration
         shell: bash
         run: |
-          test -n "$OPENAI_API_KEY" || { echo '::error::Add repository secret OPENAI_API_KEY for AI scripts.'; exit 1; }
           if [ "$UPLOAD_ENABLED" = 'true' ]; then
             test -n "$YOUTUBE_TOKEN_JSON" || { echo '::error::Missing YOUTUBE_TOKEN_JSON'; exit 1; }
           fi
