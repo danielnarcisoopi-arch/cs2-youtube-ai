@@ -63,5 +63,19 @@
     "captured_at": "2026-10-22T19:32:23.278105+00:00",
     "status": "upload_pending",
     "title": "MAC-10: Budget Finish vs Premium Price"
+  },
+  {
+    "format": "watchlist",
+    "fingerprint": "72095e7973a8376a0aca",
+    "skins": [
+      "Glock-18 | Mirror Mosaic",
+      "M4A4 | Steel Work",
+      "MAC-10 | Saib\u0101 Oni"
+    ],
+    "hook": "Which skin makes your shortlist?",
+    "captured_at": "2026-10-23T10:30:20.681858+00:00",
+    "status": "published",
+    "title": "3 CS2 Skins Under $20.00 to Compare",
+    "youtube_video_id": "86VFKr53DWo"
   }
 ]
