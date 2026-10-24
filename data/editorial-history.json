@@ -116,5 +116,19 @@
     "status": "published",
     "title": "AK-47 Skin Battle: Both Under $20.00",
     "youtube_video_id": "pAwF8E_1s_M"
+  },
+  {
+    "format": "loadout",
+    "fingerprint": "738c72069658237074b7",
+    "skins": [
+      "AK-47 | Orbit Mk01",
+      "Desert Eagle | Crimson Web",
+      "M4A4 | Dark Blossom"
+    ],
+    "hook": "Would you equip this loadout?",
+    "captured_at": "2026-10-24T15:25:31.386525+00:00",
+    "status": "published",
+    "title": "Would You Equip This $50.32 CS2 Loadout?",
+    "youtube_video_id": "3rU-EFHfyAs"
   }
 ]
