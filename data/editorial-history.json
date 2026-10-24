@@ -130,5 +130,19 @@
     "status": "published",
     "title": "Would You Equip This $50.32 CS2 Loadout?",
     "youtube_video_id": "3rU-EFHfyAs"
+  },
+  {
+    "format": "budget",
+    "fingerprint": "7dc1aa06b98121c3babe",
+    "skins": [
+      "MAC-10 | Palm",
+      "MAC-10 | Surfwood",
+      "MAC-10 | Video Cam"
+    ],
+    "hook": "Which budget finish wins?",
+    "captured_at": "2026-10-24T21:28:50.746372+00:00",
+    "status": "published",
+    "title": "3 MAC-10 Skins Under $5.00 \u2014 Which Wins?",
+    "youtube_video_id": "c8kQ82gRyqM"
   }
 ]
