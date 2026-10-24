@@ -103,5 +103,18 @@
     "status": "published",
     "title": "AK-47 | Wild Lotus: Is the Higher Asking Price Worth It?",
     "youtube_video_id": "gPXu4lCZJN4"
+  },
+  {
+    "format": "duel",
+    "fingerprint": "cf2f0ea98c2e036fd9ee",
+    "skins": [
+      "AK-47 | Breakthrough",
+      "AK-47 | Emerald Pinstripe"
+    ],
+    "hook": "Same weapon. Two finishes. You can only equip one. What is your pick?",
+    "captured_at": "2026-10-24T10:25:22.733341+00:00",
+    "status": "published",
+    "title": "AK-47 Skin Battle: Both Under $20.00",
+    "youtube_video_id": "pAwF8E_1s_M"
   }
 ]
