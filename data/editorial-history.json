@@ -157,5 +157,19 @@
     "status": "published",
     "title": "AWP: Budget Finish vs Premium Price",
     "youtube_video_id": "_rTbCfoXQYo"
+  },
+  {
+    "format": "watchlist",
+    "fingerprint": "47fab7654ad977440f46",
+    "skins": [
+      "Desert Eagle | Heirloom",
+      "MAC-10 | Amber Fade",
+      "USP-S | Flashback"
+    ],
+    "hook": "Which skin makes your shortlist?",
+    "captured_at": "2026-10-25T18:19:19.955577+00:00",
+    "status": "published",
+    "title": "3 CS2 Skins Under $20.00 to Compare",
+    "youtube_video_id": "reaqAiAa4qU"
   }
 ]
