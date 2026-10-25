@@ -144,5 +144,18 @@
     "status": "published",
     "title": "3 MAC-10 Skins Under $5.00 \u2014 Which Wins?",
     "youtube_video_id": "c8kQ82gRyqM"
+  },
+  {
+    "format": "premium_budget",
+    "fingerprint": "ebe33a7fed5e7e0ea140",
+    "skins": [
+      "AWP | Acheron",
+      "AWP | Sovereign Flame"
+    ],
+    "hook": "Budget finish or premium price? Choose the look before checking the gap.",
+    "captured_at": "2026-10-25T14:13:17.844710+00:00",
+    "status": "published",
+    "title": "AWP: Budget Finish vs Premium Price",
+    "youtube_video_id": "_rTbCfoXQYo"
   }
 ]
