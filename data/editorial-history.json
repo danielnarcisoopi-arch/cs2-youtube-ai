@@ -197,5 +197,18 @@
     "status": "published",
     "title": "MAC-10 | Candy Apple: Is the Higher Asking Price Worth It?",
     "youtube_video_id": "28iikPsqot4"
+  },
+  {
+    "format": "duel",
+    "fingerprint": "2a825a4556c904888c0f",
+    "skins": [
+      "AK-47 | Blue Laminate",
+      "AK-47 | Wintergreen"
+    ],
+    "hook": "Make your pick now, then check whether the price changes your answer.",
+    "captured_at": "2026-10-26T23:12:03.055851+00:00",
+    "status": "published",
+    "title": "AK-47 Skin Battle: Both Under $20.00",
+    "youtube_video_id": "HK8OCBVrO0g"
   }
 ]
