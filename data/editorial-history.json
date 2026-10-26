@@ -185,5 +185,17 @@
     "status": "published",
     "title": "3 CS2 Skins With Plenty of Listings \u2014 Your Pick?",
     "youtube_video_id": "2rICYnE41us"
+  },
+  {
+    "format": "wear",
+    "fingerprint": "4f3dba849c8c8859b2b5",
+    "skins": [
+      "MAC-10 | Candy Apple"
+    ],
+    "hook": "A wear label changes the price. Would it change which listing you choose?",
+    "captured_at": "2026-10-26T16:42:08.250680+00:00",
+    "status": "published",
+    "title": "MAC-10 | Candy Apple: Is the Higher Asking Price Worth It?",
+    "youtube_video_id": "28iikPsqot4"
   }
 ]
