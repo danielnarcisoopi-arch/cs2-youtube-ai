@@ -174,7 +174,7 @@ MAP_CONTEXT: dict[str, tuple[str, str, str, str]] = {
     "post-plant": ("de_mirage", "MIRAGE", "A Site", "Jungle"),
     "late-round": ("de_anubis", "ANUBIS", "Palace", "A Site"),
     "rotate-info": ("de_inferno", "INFERNO", "Middle", "Banana"),
-    "reposition": ("de_dust2", "DUST II", "Long A", "Car"),
+    "reposition": ("de_dust2", "DUST II", "Long A", "A Site"),
     "deny-isolation": ("de_anubis", "ANUBIS", "Mid", "Palace"),
     "retake-utility": ("de_ancient", "ANCIENT", "CT Spawn", "B Site"),
     "protect-utility": ("de_inferno", "INFERNO", "A Site", "Arch"),
