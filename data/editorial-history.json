@@ -224,5 +224,19 @@
     "status": "published",
     "title": "Would You Equip This $9.21 CS2 Loadout?",
     "youtube_video_id": "p_eofomggMs"
+  },
+  {
+    "format": "budget",
+    "fingerprint": "7cf7d803df51cc6a2e3f",
+    "skins": [
+      "M4A4 | Dark Operative",
+      "M4A4 | Etch Lord",
+      "M4A4 | Polysoup"
+    ],
+    "hook": "Which budget finish wins?",
+    "captured_at": "2026-10-27T22:55:33.760484+00:00",
+    "status": "published",
+    "title": "3 M4A4 Skins Under $20.00 \u2014 Which Wins?",
+    "youtube_video_id": "Vqy_IdxuYuk"
   }
 ]
