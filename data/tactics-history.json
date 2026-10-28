@@ -8,6 +8,7 @@
     "late-round",
     "rotate-info",
     "reposition",
-    "deny-isolation"
+    "deny-isolation",
+    "retake-utility"
   ]
 }
