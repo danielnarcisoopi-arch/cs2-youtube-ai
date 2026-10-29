@@ -9,6 +9,7 @@
     "rotate-info",
     "reposition",
     "deny-isolation",
-    "retake-utility"
+    "retake-utility",
+    "protect-utility"
   ]
 }
