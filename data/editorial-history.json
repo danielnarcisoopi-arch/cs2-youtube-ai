@@ -291,5 +291,18 @@
     "status": "published",
     "title": "AWP | Hyper Beast: Is the Higher Asking Price Worth It?",
     "youtube_video_id": "nSdtf7VtL5s"
+  },
+  {
+    "format": "duel",
+    "fingerprint": "41ff2214cc07c2d183fb",
+    "skins": [
+      "AWP | Arsenic Spill",
+      "AWP | PAW"
+    ],
+    "hook": "Would you choose the cheaper finish, or pay the difference for the other?",
+    "captured_at": "2026-10-30T16:39:06.216017+00:00",
+    "status": "published",
+    "title": "AWP Skin Battle: Both Under $20.00",
+    "youtube_video_id": "baWpaJ01Teo"
   }
 ]
