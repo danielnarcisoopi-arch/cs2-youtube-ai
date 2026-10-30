@@ -10,6 +10,7 @@
     "reposition",
     "deny-isolation",
     "retake-utility",
-    "protect-utility"
+    "protect-utility",
+    "trade-not-chase"
   ]
 }
