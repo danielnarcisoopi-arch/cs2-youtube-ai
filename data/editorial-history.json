@@ -304,5 +304,19 @@
     "status": "published",
     "title": "AWP Skin Battle: Both Under $20.00",
     "youtube_video_id": "baWpaJ01Teo"
+  },
+  {
+    "format": "loadout",
+    "fingerprint": "5008b33b1b2e4a6316ee",
+    "skins": [
+      "AK-47 | Midnight Laminate",
+      "Glock-18 | Winterized",
+      "M4A1-S | Control Panel"
+    ],
+    "hook": "Would you equip this loadout?",
+    "captured_at": "2026-10-30T22:54:46.787387+00:00",
+    "status": "published",
+    "title": "Would You Equip This $12.24 CS2 Loadout?",
+    "youtube_video_id": "RM5wlh1VI4Y"
   }
 ]
