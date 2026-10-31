@@ -332,5 +332,18 @@
     "status": "published",
     "title": "3 M4A4 Skins Under $20.00 \u2014 Which Wins?",
     "youtube_video_id": "LG4tybN6BN0"
+  },
+  {
+    "format": "premium_budget",
+    "fingerprint": "eaad18026ac35c7f661e",
+    "skins": [
+      "AWP | Mortis",
+      "AWP | Pink DDPAT"
+    ],
+    "hook": "Here is a budget option next to a premium one. Which would you keep?",
+    "captured_at": "2026-10-31T22:24:05.962085+00:00",
+    "status": "published",
+    "title": "AWP: Budget Finish vs Premium Price",
+    "youtube_video_id": "r0_wM6kXKmE"
   }
 ]
