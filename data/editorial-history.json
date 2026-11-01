@@ -345,5 +345,19 @@
     "status": "published",
     "title": "AWP: Budget Finish vs Premium Price",
     "youtube_video_id": "r0_wM6kXKmE"
+  },
+  {
+    "format": "watchlist",
+    "fingerprint": "0dad92546601375a1b46",
+    "skins": [
+      "Desert Eagle | Mecha Industries",
+      "MP9 | Old Roots",
+      "USP-S | Stainless"
+    ],
+    "hook": "Which skin makes your shortlist?",
+    "captured_at": "2026-11-01T16:43:03.911105+00:00",
+    "status": "published",
+    "title": "3 CS2 Skins Under $20.00 to Compare",
+    "youtube_video_id": "SnE2eI7GsYM"
   }
 ]
