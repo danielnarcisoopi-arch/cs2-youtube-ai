@@ -385,5 +385,18 @@
     "status": "published",
     "title": "AK-47 | Black Laminate: Is the Higher Asking Price Worth It?",
     "youtube_video_id": "9quzVEUCfuo"
+  },
+  {
+    "format": "duel",
+    "fingerprint": "cf8883c74013c0ddab8a",
+    "skins": [
+      "MP9 | Buff Blue",
+      "MP9 | Modest Threat"
+    ],
+    "hook": "Two skins enter your shortlist. Only one gets the loadout slot.",
+    "captured_at": "2026-11-03T17:41:19.845235+00:00",
+    "status": "published",
+    "title": "MP9 Skin Battle: Both Under $5.00",
+    "youtube_video_id": "djl000lM8Mw"
   }
 ]
