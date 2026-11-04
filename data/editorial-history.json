@@ -412,5 +412,19 @@
     "status": "published",
     "title": "Would You Equip This $35.69 CS2 Loadout?",
     "youtube_video_id": "y4k89FzGgGE"
+  },
+  {
+    "format": "budget",
+    "fingerprint": "de1ef98a0cdcce827647",
+    "skins": [
+      "MP9 | Multi-Terrain",
+      "MP9 | Pine",
+      "MP9 | Urban Sovereign"
+    ],
+    "hook": "Which budget finish wins?",
+    "captured_at": "2026-11-04T17:54:40.750137+00:00",
+    "status": "published",
+    "title": "3 MP9 Skins Under $5.00 \u2014 Which Wins?",
+    "youtube_video_id": "os5M1A3C1ag"
   }
 ]
