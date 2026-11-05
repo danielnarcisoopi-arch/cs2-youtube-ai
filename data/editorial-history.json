@@ -439,5 +439,19 @@
     "status": "published",
     "title": "MAC-10: Budget Finish vs Premium Price",
     "youtube_video_id": "mcsaT4-A_M8"
+  },
+  {
+    "format": "watchlist",
+    "fingerprint": "e684a70e2f4204c7a1ab",
+    "skins": [
+      "Glock-18 | Weasel",
+      "M4A1-S | Emphorosaur-S",
+      "MAC-10 | Echoing Sands"
+    ],
+    "hook": "Which skin makes your shortlist?",
+    "captured_at": "2026-11-05T17:56:58.951056+00:00",
+    "status": "published",
+    "title": "3 CS2 Skins Under $20.00 to Compare",
+    "youtube_video_id": "73HNjGxPUng"
   }
 ]
