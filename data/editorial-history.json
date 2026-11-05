@@ -426,5 +426,18 @@
     "status": "published",
     "title": "3 MP9 Skins Under $5.00 \u2014 Which Wins?",
     "youtube_video_id": "os5M1A3C1ag"
+  },
+  {
+    "format": "premium_budget",
+    "fingerprint": "77f15bdd0c108dc0a244",
+    "skins": [
+      "MAC-10 | Silver",
+      "MAC-10 | Tornado"
+    ],
+    "hook": "Budget finish or premium price? Choose the look before checking the gap.",
+    "captured_at": "2026-11-05T00:16:42.107966+00:00",
+    "status": "published",
+    "title": "MAC-10: Budget Finish vs Premium Price",
+    "youtube_video_id": "mcsaT4-A_M8"
   }
 ]
