@@ -467,5 +467,17 @@
     "status": "published",
     "title": "3 CS2 Skins With Plenty of Listings \u2014 Your Pick?",
     "youtube_video_id": "vPgAfB5TSq0"
+  },
+  {
+    "format": "wear",
+    "fingerprint": "2302e73c9d2363c1b4b3",
+    "skins": [
+      "MP9 | Food Chain"
+    ],
+    "hook": "A wear label changes the price. Would it change which listing you choose?",
+    "captured_at": "2026-11-06T17:19:41.058778+00:00",
+    "status": "published",
+    "title": "MP9 | Food Chain: Is the Higher Asking Price Worth It?",
+    "youtube_video_id": "k8KCHCmcxDM"
   }
 ]
