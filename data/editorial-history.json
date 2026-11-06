@@ -479,5 +479,18 @@
     "status": "published",
     "title": "MP9 | Food Chain: Is the Higher Asking Price Worth It?",
     "youtube_video_id": "k8KCHCmcxDM"
+  },
+  {
+    "format": "duel",
+    "fingerprint": "48c3cc09b6b4e22962b9",
+    "skins": [
+      "MAC-10 | Ensnared",
+      "MAC-10 | Video Cam"
+    ],
+    "hook": "One weapon slot, two choices. Which side are you taking today?",
+    "captured_at": "2026-11-06T23:42:29.768351+00:00",
+    "status": "published",
+    "title": "MAC-10 Skin Battle: Both Under $5.00",
+    "youtube_video_id": "egvG_cFGSUM"
   }
 ]
