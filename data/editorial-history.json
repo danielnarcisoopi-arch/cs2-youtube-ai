@@ -520,5 +520,18 @@
     "status": "published",
     "title": "3 USP-S Skins Under $10.00 \u2014 Which Wins?",
     "youtube_video_id": "9GZidpLlsBU"
+  },
+  {
+    "format": "premium_budget",
+    "fingerprint": "91cd33a903f332416e18",
+    "skins": [
+      "M4A4 | Hellfire",
+      "M4A4 | Spider Lily"
+    ],
+    "hook": "One weapon, two very different price points. Would you spend the extra money?",
+    "captured_at": "2026-11-08T16:36:02.425920+00:00",
+    "status": "published",
+    "title": "M4A4: Budget Finish vs Premium Price",
+    "youtube_video_id": "zBhZZ-cYQqo"
   }
 ]
