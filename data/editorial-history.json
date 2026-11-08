@@ -533,5 +533,19 @@
     "status": "published",
     "title": "M4A4: Budget Finish vs Premium Price",
     "youtube_video_id": "zBhZZ-cYQqo"
+  },
+  {
+    "format": "watchlist",
+    "fingerprint": "baa810b7d55b2e13227c",
+    "skins": [
+      "AK-47 | Predator",
+      "Desert Eagle | Serpent Strike",
+      "MAC-10 | Heat"
+    ],
+    "hook": "Which skin makes your shortlist?",
+    "captured_at": "2026-11-08T22:44:50.114361+00:00",
+    "status": "published",
+    "title": "3 CS2 Skins Under $20.00 to Compare",
+    "youtube_video_id": "iLExGYqG9Ro"
   }
 ]
