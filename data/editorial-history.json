@@ -600,5 +600,19 @@
     "status": "published",
     "title": "Would You Equip This $11.41 CS2 Loadout?",
     "youtube_video_id": "C_g5c4NtGPc"
+  },
+  {
+    "format": "budget",
+    "fingerprint": "188dcfc3609e062988a0",
+    "skins": [
+      "M4A1-S | Basilisk",
+      "M4A1-S | Leaded Glass",
+      "M4A1-S | Liquidation"
+    ],
+    "hook": "Which budget finish wins?",
+    "captured_at": "2026-11-12T01:26:04.615803+00:00",
+    "status": "published",
+    "title": "3 M4A1-S Skins Under $10.00 \u2014 Which Wins?",
+    "youtube_video_id": "MnwNwJPon8k"
   }
 ]
