@@ -614,5 +614,18 @@
     "status": "published",
     "title": "3 M4A1-S Skins Under $10.00 \u2014 Which Wins?",
     "youtube_video_id": "MnwNwJPon8k"
+  },
+  {
+    "format": "premium_budget",
+    "fingerprint": "459124e3b03e9eed939c",
+    "skins": [
+      "MAC-10 | Neon Rider",
+      "MAC-10 | Sienna Damask"
+    ],
+    "hook": "The expensive option has competition. Which finish would you actually equip?",
+    "captured_at": "2026-11-12T18:04:37.980171+00:00",
+    "status": "published",
+    "title": "MAC-10: Budget Finish vs Premium Price",
+    "youtube_video_id": "mjMHzz_q83U"
   }
 ]
