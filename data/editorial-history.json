@@ -667,5 +667,18 @@
     "status": "published",
     "title": "M4A1-S | Fizzy POP: Is the Higher Asking Price Worth It?",
     "youtube_video_id": "vc2p7Cg0hGI"
+  },
+  {
+    "format": "duel",
+    "fingerprint": "fbb9c059b09ca37bfad0",
+    "skins": [
+      "M4A1-S | Black Lotus",
+      "M4A1-S | Stratosphere"
+    ],
+    "hook": "Make your pick now, then check whether the price changes your answer.",
+    "captured_at": "2026-11-14T16:29:31.936365+00:00",
+    "status": "published",
+    "title": "M4A1-S Skin Battle: Both Under $10.00",
+    "youtube_video_id": "VQshiT18D1g"
   }
 ]
