@@ -694,5 +694,19 @@
     "status": "published",
     "title": "Would You Equip This $34.57 CS2 Loadout?",
     "youtube_video_id": "R3BNFsOo51k"
+  },
+  {
+    "format": "budget",
+    "fingerprint": "ca888f780f6ff02b7173",
+    "skins": [
+      "Glock-18 | Nuclear Garden",
+      "Glock-18 | Off World",
+      "Glock-18 | Reactor"
+    ],
+    "hook": "Which budget finish wins?",
+    "captured_at": "2026-11-15T16:54:54.039769+00:00",
+    "status": "published",
+    "title": "3 Glock-18 Skins Under $20.00 \u2014 Which Wins?",
+    "youtube_video_id": "p9dFcBHJRRE"
   }
 ]
