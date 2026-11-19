@@ -761,5 +761,18 @@
     "status": "published",
     "title": "AWP | BOOM: Is the Higher Asking Price Worth It?",
     "youtube_video_id": "5EZL-hzzO5s"
+  },
+  {
+    "format": "duel",
+    "fingerprint": "0f39acaaedf5ed79fa87",
+    "skins": [
+      "Desert Eagle | Directive",
+      "Desert Eagle | Kumicho Dragon"
+    ],
+    "hook": "One weapon slot, two choices. Which side are you taking today?",
+    "captured_at": "2026-11-19T01:03:00.591484+00:00",
+    "status": "published",
+    "title": "Desert Eagle Skin Battle: Both Under $20.00",
+    "youtube_video_id": "GYV9W0cKiYY"
   }
 ]
