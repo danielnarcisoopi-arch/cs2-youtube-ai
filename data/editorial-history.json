@@ -774,5 +774,19 @@
     "status": "published",
     "title": "Desert Eagle Skin Battle: Both Under $20.00",
     "youtube_video_id": "GYV9W0cKiYY"
+  },
+  {
+    "format": "loadout",
+    "fingerprint": "05108d9af37d4daea825",
+    "skins": [
+      "AK-47 | The Oligarch",
+      "Desert Eagle | Mecha Industries",
+      "M4A1-S | Fatal Glitch"
+    ],
+    "hook": "Would you equip this loadout?",
+    "captured_at": "2026-11-19T18:56:23.825161+00:00",
+    "status": "published",
+    "title": "Would You Equip This $49.19 CS2 Loadout?",
+    "youtube_video_id": "CTyWsysiAxM"
   }
 ]
