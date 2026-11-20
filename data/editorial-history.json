@@ -802,5 +802,18 @@
     "status": "published",
     "title": "3 USP-S Skins Under $20.00 \u2014 Which Wins?",
     "youtube_video_id": "6OCkCsojY1U"
+  },
+  {
+    "format": "premium_budget",
+    "fingerprint": "e46547fa84e6424ffe50",
+    "skins": [
+      "Desert Eagle | Oxide Blaze",
+      "Desert Eagle | Printstream"
+    ],
+    "hook": "A bigger price tag does not choose your loadout. Compare these two finishes.",
+    "captured_at": "2026-11-20T18:28:14.808768+00:00",
+    "status": "published",
+    "title": "Desert Eagle: Budget Finish vs Premium Price",
+    "youtube_video_id": "ytnH34jG2Vc"
   }
 ]
