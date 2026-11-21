@@ -815,5 +815,19 @@
     "status": "published",
     "title": "Desert Eagle: Budget Finish vs Premium Price",
     "youtube_video_id": "ytnH34jG2Vc"
+  },
+  {
+    "format": "watchlist",
+    "fingerprint": "027a2df8ee01abb19a49",
+    "skins": [
+      "AK-47 | Safari Mesh",
+      "AWP | Capillary",
+      "Glock-18 | Winterized"
+    ],
+    "hook": "Which skin makes your shortlist?",
+    "captured_at": "2026-11-21T00:43:09.442768+00:00",
+    "status": "published",
+    "title": "3 CS2 Skins Under $20.00 to Compare",
+    "youtube_video_id": "LvF3Y4axF_8"
   }
 ]
