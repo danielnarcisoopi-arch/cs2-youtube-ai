@@ -868,5 +868,19 @@
     "status": "published",
     "title": "MP9 Skin Battle: Both Under $10.00",
     "youtube_video_id": "Xe8ZQNNjtwo"
+  },
+  {
+    "format": "loadout",
+    "fingerprint": "9c1a9e3f77a7782be45b",
+    "skins": [
+      "AK-47 | Ice Coaled",
+      "Glock-18 | Weasel",
+      "M4A1-S | Fizzy POP"
+    ],
+    "hook": "Would you equip this loadout?",
+    "captured_at": "2026-11-23T00:08:51.956987+00:00",
+    "status": "published",
+    "title": "Would You Equip This $13.77 CS2 Loadout?",
+    "youtube_video_id": "WK-AJC8PqIA"
   }
 ]
