@@ -882,5 +882,19 @@
     "status": "published",
     "title": "Would You Equip This $13.77 CS2 Loadout?",
     "youtube_video_id": "WK-AJC8PqIA"
+  },
+  {
+    "format": "budget",
+    "fingerprint": "028d6a19a3ea8a16967a",
+    "skins": [
+      "USP-S | Jawbreaker",
+      "USP-S | Ticket to Hell",
+      "USP-S | Torque"
+    ],
+    "hook": "Which budget finish wins?",
+    "captured_at": "2026-11-23T21:59:54.386918+00:00",
+    "status": "published",
+    "title": "3 USP-S Skins Under $10.00 \u2014 Which Wins?",
+    "youtube_video_id": "xxNj5orfqIg"
   }
 ]
