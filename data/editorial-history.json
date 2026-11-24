@@ -896,5 +896,18 @@
     "status": "published",
     "title": "3 USP-S Skins Under $10.00 \u2014 Which Wins?",
     "youtube_video_id": "xxNj5orfqIg"
+  },
+  {
+    "format": "premium_budget",
+    "fingerprint": "1e16712a87979734dc9b",
+    "skins": [
+      "MP9 | Dark Age",
+      "MP9 | Latte Rush"
+    ],
+    "hook": "Budget finish or premium price? Choose the look before checking the gap.",
+    "captured_at": "2026-11-24T20:34:58.430271+00:00",
+    "status": "published",
+    "title": "MP9: Budget Finish vs Premium Price",
+    "youtube_video_id": "1njJ5D1V1s0"
   }
 ]
