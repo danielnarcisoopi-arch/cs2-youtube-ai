@@ -909,5 +909,19 @@
     "status": "published",
     "title": "MP9: Budget Finish vs Premium Price",
     "youtube_video_id": "1njJ5D1V1s0"
+  },
+  {
+    "format": "watchlist",
+    "fingerprint": "697bfb4f10a094f53c8d",
+    "skins": [
+      "AK-47 | Breakthrough",
+      "Glock-18 | Block-18",
+      "Glock-18 | Steel Disruption"
+    ],
+    "hook": "Which skin makes your shortlist?",
+    "captured_at": "2026-11-25T19:52:26.749663+00:00",
+    "status": "published",
+    "title": "3 CS2 Skins Under $20.00 to Compare",
+    "youtube_video_id": "xf2kz1HS97U"
   }
 ]
