@@ -949,5 +949,18 @@
     "status": "published",
     "title": "USP-S | Guardian: Is the Higher Asking Price Worth It?",
     "youtube_video_id": "GMNaXdzDe7E"
+  },
+  {
+    "format": "duel",
+    "fingerprint": "e93e2e7504ffbfe8fc8a",
+    "skins": [
+      "Glock-18 | Ocean Topo",
+      "Glock-18 | Oxide Blaze"
+    ],
+    "hook": "Would you choose the cheaper finish, or pay the difference for the other?",
+    "captured_at": "2026-11-28T18:04:16.400695+00:00",
+    "status": "published",
+    "title": "Glock-18 Skin Battle: Both Under $5.00",
+    "youtube_video_id": "3FsXNcs4IcM"
   }
 ]
